@@ -4,6 +4,11 @@ Dependabot checks pinned Python, Node, and GitHub Actions inputs weekly. The
 separate `Dependency Maintenance` workflow drains safe updates without making
 ordinary branches responsible for an unrelated dependency backlog.
 
+`constraints.txt` is generated resolver output and is excluded from independent
+Dependabot discovery. Python pull requests update direct requirement files; a
+maintainer regenerates constraints from all three requirement inputs before
+merging when dependency resolution changes.
+
 ## Automated Gate
 
 The workflow runs every Tuesday, can be dispatched manually, and continues

@@ -83,6 +83,11 @@ Add completion history with `python3 tools/history_log.py add`. Refresh
 `constraints.txt` when Python dependencies change. Finish matching Git-local
 task state only after push and exact-commit CI.
 
+Dependabot must not independently bump generated transitive pins in
+`constraints.txt`. For a direct Python update, regenerate the lock from
+`requirements.txt`, `requirements-dev.txt`, and `requirements-deploy.txt`, then
+require the normal exact-head gates.
+
 ## Releasing
 
 This is a snapshot template (consumers fork/"Use this template"); there is no
