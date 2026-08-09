@@ -38,6 +38,10 @@ that exists only to exercise the gates on a fresh clone.
   each agent is used for its strengths. Only `/install` must exist in every
   first-class agent format. Do not build machinery to mirror all skills across
   agents — that fights how multi-agent setups are actually used.
+- The reusable memory and agent-control implementations are maintained in the
+  sibling public repositories `long-running-project-memory` and
+  `agent-control`. Sync their generic executable cores before adding local
+  changes; keep Django-specific integration here.
 
 ## How to change things safely
 
@@ -47,9 +51,9 @@ that exists only to exercise the gates on a fresh clone.
 - **Add a runbook:** add `docs/runbooks/<name>.md`, list it in the runbooks
   `README.md` and `AGENTS.md`, and add it to `REQUIRED_FILES` in
   `tools/check_memory_system.py` if it should be mandatory.
-- **Add a topic memory file:** use the standard five-section shape (Current
-  Setup, Current Rules, Runbooks, Lookup Anchors, Deprecated / Historical), and
-  route it from `PROJECT_MEMORY.md` (the checker enforces routing).
+- **Add a topic memory file:** use the four current-only sections (`Current
+  Setup`, `Current Rules`, `Runbooks`, `Lookup Anchors`), register ownership in
+  `docs/memory/topics.json`, and route it from `PROJECT_MEMORY.md`.
 - **Add a gate:** wire it into `hooks/pre-commit` and `.github/workflows/ci.yml`,
   and into `tools/check_memory_system.py`'s required-locations checks if it must
   always run.
@@ -66,17 +70,22 @@ ruff check .
 lint-imports
 python3 tools/check_security_patterns.py
 python3 tools/check_memory_system.py
+python3 tools/project_knowledge.py check
+python3 tools/agent_control.py doctor
+python3 -m unittest tools.test_agent_control tools.test_dependabot_maintenance tools.test_project_knowledge
 python3 manage.py test web
 npm run typecheck && npm run build:js
 git diff --exit-code -- static/web/js
 python3 tools/sync_agents.py --check
 ```
 
-Update `CHANGELOG.md`. Refresh `constraints.txt` when Python dependencies
-change. Keep `AGENT_HANDOFF.md` to current state only.
+Add completion history with `python3 tools/history_log.py add`. Refresh
+`constraints.txt` when Python dependencies change. Finish matching Git-local
+task state only after push and exact-commit CI.
 
 ## Releasing
 
 This is a snapshot template (consumers fork/"Use this template"); there is no
-upgrade channel back into existing clones. Keep dependency pins current via
-Dependabot, and treat `main` as always-clonable.
+upgrade channel back into existing clones. Dependabot proposes updates and the
+bounded maintenance workflow drains verified non-major changes; major updates
+remain for review. Treat `main` as always-clonable.

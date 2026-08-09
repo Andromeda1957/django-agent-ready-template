@@ -27,7 +27,3 @@ entirely, follow the opt-out section in the README.
 
 - Config: `tsconfig.json`, `tsconfig.build.json`, `package.json`.
 - Source/output: `static/web/ts/`, `static/web/js/`.
-
-## Deprecated / Historical
-
-- None yet. Record superseded TypeScript facts here with the date they changed.

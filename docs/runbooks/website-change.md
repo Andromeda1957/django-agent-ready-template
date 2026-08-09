@@ -5,7 +5,7 @@ assets, migrations, production behavior, or user-facing content.
 
 ## Steps
 
-1. Read `AGENT_HANDOFF.md`.
+1. Inspect `python3 tools/task_state.py list` and any matching resume packet.
 2. Read relevant topic memory from `docs/memory/`.
 3. Inspect the actual code/config before deciding implementation.
 4. Before editing files, use `docs/runbooks/task-memory-triage.md`; if durable
@@ -26,13 +26,13 @@ assets, migrations, production behavior, or user-facing content.
 9. If TypeScript under `static/web/ts/` changed, run `npm run build:js` and commit
    the generated `static/web/js/*.js` assets.
 10. If UI/layout changed, follow `docs/runbooks/ui-verification.md`.
-11. Update `CHANGELOG.md`.
+11. Add one structured completion entry with `tools/history_log.py add`.
 12. Update topic memory only for durable setup/rule/gotcha changes.
-13. Update or clear `AGENT_HANDOFF.md`.
+13. Update or finish matching Git-local task state.
 14. Commit the completed change locally.
 15. Push your default branch to your GitHub remote and wait for CI to pass on the
     exact commit.
-16. Deploy through the GitHub Actions `Deploy` workflow unless the user explicitly
+16. Deploy through the GitHub Actions `Deploy` workflow unless the owner explicitly
     said not to deploy.
 17. Live-verify the affected page/behavior.
 

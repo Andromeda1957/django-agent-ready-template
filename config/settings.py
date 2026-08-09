@@ -6,7 +6,7 @@ environment (never the repo), and production security headers turn on
 automatically when DEBUG is False. For local development, copy `.env.example` to
 `.env` and set `DEBUG=True`.
 
-See https://docs.djangoproject.com/en/6.0/ref/settings/
+See https://docs.djangoproject.com/en/6.1/ref/settings/
 """
 
 from pathlib import Path

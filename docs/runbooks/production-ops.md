@@ -28,5 +28,6 @@ details in `docs/memory/production.md`.
 
 ## Runbooks
 
-- Deploy and backup: `docs/runbooks/deploy-backup.md`.
+- Deployment and rollback: `docs/runbooks/deploy.md`.
+- Host package maintenance: `docs/runbooks/host-maintenance.md`.
 - Security gate: `docs/runbooks/security-implementation.md`.

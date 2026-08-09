@@ -1,0 +1,321 @@
+---
+- name: Activate a versioned Django release
+  hosts: all
+  become: true
+  gather_facts: false
+
+  vars:
+    app_name: "{{ lookup('env', 'APP_NAME') }}"
+    runtime_user: "{{ lookup('env', 'REMOTE_USER') }}"
+    current_dir: "{{ lookup('env', 'REMOTE_DIR') }}"
+    app_domain: "{{ lookup('env', 'APP_DOMAIN') }}"
+    release_id: "{{ lookup('env', 'RELEASE_ID') }}"
+    local_artifact: "{{ lookup('env', 'RELEASE_ARTIFACT') }}"
+    releases_dir: "{{ current_dir }}-releases"
+    shared_dir: "{{ current_dir }}-shared"
+    release_dir: "{{ releases_dir }}/{{ release_id }}"
+    remote_artifact: "/var/tmp/{{ app_name }}-{{ release_id }}.tar.gz"
+
+  pre_tasks:
+    - name: Validate bounded deployment variables
+      ansible.builtin.assert:
+        that:
+          - app_name is match('^[a-z][a-z0-9_-]{1,39}$')
+          - runtime_user is match('^[a-z_][a-z0-9_-]{0,31}$')
+          - current_dir is match('^/[A-Za-z0-9_./-]+$')
+          - app_domain is match('^[A-Za-z0-9.-]+$')
+          - release_id is match('^[A-Fa-f0-9]{7,64}$')
+          - local_artifact is file
+
+  tasks:
+    - name: Keep required host packages installed
+      ansible.builtin.apt:
+        name: [nginx, python3-venv, curl]
+        state: present
+        update_cache: true
+        cache_valid_time: 3600
+        lock_timeout: 600
+
+    - name: Create release and shared roots
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        owner: "{{ runtime_user }}"
+        group: www-data
+        mode: "0750"
+      loop:
+        - "{{ releases_dir }}"
+        - "{{ shared_dir }}"
+        - "{{ shared_dir }}/venvs"
+
+    - name: Inspect the independently provisioned production environment
+      ansible.builtin.stat:
+        path: "{{ shared_dir }}/.env"
+      register: production_env
+
+    - name: Reject a missing or exposed production environment file
+      ansible.builtin.assert:
+        that:
+          - production_env.stat.exists
+          - production_env.stat.isreg
+          - production_env.stat.pw_name == runtime_user
+          - production_env.stat.mode in ['0600', '0640']
+        fail_msg: >-
+          Provision {{ shared_dir }}/.env for {{ runtime_user }} with mode 0600
+          or 0640 before deploying; never store production secrets in Git.
+
+    - name: Upload the exact release artifact
+      ansible.builtin.copy:
+        src: "{{ local_artifact }}"
+        dest: "{{ remote_artifact }}"
+        owner: root
+        group: root
+        mode: "0600"
+
+    - name: Create the immutable release directory
+      ansible.builtin.file:
+        path: "{{ release_dir }}"
+        state: directory
+        owner: "{{ runtime_user }}"
+        group: www-data
+        mode: "0750"
+
+    - name: Extract the release artifact
+      ansible.builtin.unarchive:
+        src: "{{ remote_artifact }}"
+        dest: "{{ release_dir }}"
+        remote_src: true
+        owner: "{{ runtime_user }}"
+        group: www-data
+        creates: "{{ release_dir }}/manage.py"
+
+    - name: Link the shared environment into the release
+      ansible.builtin.file:
+        src: "{{ shared_dir }}/.env"
+        dest: "{{ release_dir }}/.env"
+        state: link
+        owner: "{{ runtime_user }}"
+        group: www-data
+
+    - name: Hash runtime dependency inputs
+      ansible.builtin.stat:
+        path: "{{ release_dir }}/{{ item }}"
+        checksum_algorithm: sha256
+      loop: [requirements.txt, constraints.txt]
+      register: runtime_dependency_inputs
+
+    - name: Select the content-addressed runtime virtual environment
+      ansible.builtin.set_fact:
+        runtime_venv: >-
+          {{ shared_dir }}/venvs/{{ runtime_dependency_inputs.results[0].stat.checksum }}-{{ runtime_dependency_inputs.results[1].stat.checksum }}
+
+    - name: Create the content-addressed runtime virtual environment
+      ansible.builtin.command:
+        argv: [python3, -m, venv, "{{ runtime_venv }}"]
+        creates: "{{ runtime_venv }}/bin/python"
+      become_user: "{{ runtime_user }}"
+
+    - name: Inspect the runtime dependency installation marker
+      ansible.builtin.stat:
+        path: "{{ runtime_venv }}/.requirements-installed"
+      register: runtime_dependencies
+
+    - name: Install pinned runtime dependencies
+      ansible.builtin.command:
+        argv:
+          - "{{ runtime_venv }}/bin/pip"
+          - install
+          - --requirement
+          - "{{ release_dir }}/requirements.txt"
+      become_user: "{{ runtime_user }}"
+      changed_when: true
+      when: not runtime_dependencies.stat.exists
+
+    - name: Record the completed runtime dependency installation
+      ansible.builtin.file:
+        path: "{{ runtime_venv }}/.requirements-installed"
+        state: touch
+        owner: "{{ runtime_user }}"
+        group: www-data
+        mode: "0640"
+      when: not runtime_dependencies.stat.exists
+
+    - name: Link the shared runtime environment into the release
+      ansible.builtin.file:
+        src: "{{ runtime_venv }}"
+        dest: "{{ release_dir }}/venv"
+        state: link
+        owner: "{{ runtime_user }}"
+        group: www-data
+
+    - name: Apply migrations before activation
+      ansible.builtin.command:
+        argv: ["{{ release_dir }}/venv/bin/python", manage.py, migrate, --no-input]
+        chdir: "{{ release_dir }}"
+      become_user: "{{ runtime_user }}"
+      changed_when: true
+
+    - name: Collect static files before activation
+      ansible.builtin.command:
+        argv:
+          - "{{ release_dir }}/venv/bin/python"
+          - manage.py
+          - collectstatic
+          - --clear
+          - --no-input
+        chdir: "{{ release_dir }}"
+      become_user: "{{ runtime_user }}"
+      changed_when: true
+
+    - name: Inspect the previous release target
+      ansible.builtin.command:
+        argv: [readlink, -f, "{{ current_dir }}"]
+      register: previous_release
+      changed_when: false
+      failed_when: false
+
+    - name: Install service definitions from the incoming release
+      ansible.builtin.copy:
+        src: "{{ release_dir }}/{{ item }}"
+        dest: "/etc/systemd/system/{{ item }}"
+        remote_src: true
+        owner: root
+        group: root
+        mode: "0644"
+        backup: true
+      loop:
+        - "{{ app_name }}.service"
+        - "{{ app_name }}-health-monitor.service"
+        - "{{ app_name }}-health-monitor.timer"
+      register: service_definition_copies
+
+    - name: Install Nginx configuration from the incoming release
+      ansible.builtin.copy:
+        src: "{{ release_dir }}/{{ app_name }}_nginx"
+        dest: "/etc/nginx/sites-available/{{ app_name }}"
+        remote_src: true
+        owner: root
+        group: root
+        mode: "0644"
+        backup: true
+      register: nginx_config_copy
+
+    - name: Enable the application Nginx site
+      ansible.builtin.file:
+        src: "/etc/nginx/sites-available/{{ app_name }}"
+        dest: "/etc/nginx/sites-enabled/{{ app_name }}"
+        state: link
+        force: true
+
+    - name: Disable the distribution default Nginx site
+      ansible.builtin.file:
+        path: /etc/nginx/sites-enabled/default
+        state: absent
+
+    - name: Validate and activate the release with rollback
+      block:
+        - name: Atomically point current at the incoming release
+          ansible.builtin.file:
+            src: "{{ release_dir }}"
+            dest: "{{ current_dir }}"
+            state: link
+            force: true
+
+        - name: Reload systemd definitions
+          ansible.builtin.systemd_service:
+            daemon_reload: true
+
+        - name: Validate Nginx configuration
+          ansible.builtin.command: /usr/sbin/nginx -t
+          changed_when: false
+
+        - name: Enable and restart the application
+          ansible.builtin.systemd_service:
+            name: "{{ app_name }}"
+            enabled: true
+            state: restarted
+
+        - name: Enable the health timer
+          ansible.builtin.systemd_service:
+            name: "{{ app_name }}-health-monitor.timer"
+            enabled: true
+            state: started
+
+        - name: Reload Nginx
+          ansible.builtin.systemd_service:
+            name: nginx
+            state: reloaded
+
+        - name: Verify the activated release through Nginx
+          ansible.builtin.uri:
+            url: http://127.0.0.1/
+            headers:
+              Host: "{{ app_domain }}"
+            follow_redirects: none
+            status_code: [200, 301, 302]
+            timeout: 15
+          register: release_health
+          retries: 6
+          delay: 5
+          until: release_health.status in [200, 301, 302]
+      rescue:
+        - name: Restore the previous service definitions
+          ansible.builtin.copy:
+            src: "{{ item.backup_file }}"
+            dest: "{{ item.dest }}"
+            remote_src: true
+            owner: root
+            group: root
+            mode: "0644"
+          loop: "{{ service_definition_copies.results }}"
+          when: item.backup_file is defined
+
+        - name: Restore the previous Nginx configuration
+          ansible.builtin.copy:
+            src: "{{ nginx_config_copy.backup_file }}"
+            dest: "/etc/nginx/sites-available/{{ app_name }}"
+            remote_src: true
+            owner: root
+            group: root
+            mode: "0644"
+          when: nginx_config_copy.backup_file is defined
+
+        - name: Restore the previous release symlink
+          ansible.builtin.file:
+            src: "{{ previous_release.stdout }}"
+            dest: "{{ current_dir }}"
+            state: link
+            force: true
+          when:
+            - previous_release.rc == 0
+            - previous_release.stdout is match('^' ~ releases_dir ~ '/[A-Fa-f0-9]+$')
+
+        - name: Reload systemd after rollback
+          ansible.builtin.systemd_service:
+            daemon_reload: true
+
+        - name: Restart the previous release
+          ansible.builtin.systemd_service:
+            name: "{{ app_name }}"
+            state: restarted
+          when: previous_release.rc == 0
+
+        - name: Reload restored service and Nginx configuration
+          ansible.builtin.command: /usr/sbin/nginx -t
+          changed_when: false
+
+        - name: Reload Nginx after rollback
+          ansible.builtin.systemd_service:
+            name: nginx
+            state: reloaded
+
+        - name: Report failed activation
+          ansible.builtin.fail:
+            msg: >-
+              Release {{ release_id }} failed activation or health verification;
+              the previous release was restored when available.
+      always:
+        - name: Remove the uploaded transient archive
+          ansible.builtin.file:
+            path: "{{ remote_artifact }}"
+            state: absent

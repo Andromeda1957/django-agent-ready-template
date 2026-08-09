@@ -1,6 +1,7 @@
 name: CI
 
 on:
+  workflow_dispatch:
   pull_request:
   push:
     branches:
@@ -22,23 +23,24 @@ jobs:
 
     steps:
       - name: Check out repository
-        # actions/checkout v6 pinned to a full commit SHA.
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        # actions/checkout v7.0.1 pinned to a full commit SHA.
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
 
       - name: Set up Python
-        # actions/setup-python v6 pinned to a full commit SHA.
-        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
+        # actions/setup-python v7.0.0 pinned to a full commit SHA.
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
         with:
           python-version: "3.12"
           cache: pip
           cache-dependency-path: |
             requirements.txt
             requirements-dev.txt
+            requirements-deploy.txt
             constraints.txt
 
       - name: Set up Node.js
-        # actions/setup-node v6 pinned to a full commit SHA.
-        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        # actions/setup-node v7.0.0 pinned to a full commit SHA.
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
         with:
           node-version: "22"
           cache: npm
@@ -61,6 +63,7 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           python -m pip install -r requirements.txt -r requirements-dev.txt
+          python -m pip install -r requirements-deploy.txt
 
       - name: Install Node dependencies
         run: npm ci
@@ -80,16 +83,33 @@ jobs:
             --config p/ci \
             --error \
             --metrics=off \
-            config web static/web/ts tools .github
+            config web static/web/ts tools ops .github
 
       - name: Python dependency audit
-        run: python -m pip_audit
+        run: python -m pip_audit -r requirements.txt
 
       - name: Node dependency audit
         run: npm audit --audit-level=moderate
 
       - name: Memory system
         run: python3 tools/check_memory_system.py
+
+      - name: Agent control
+        run: |
+          python3 -m json.tool agent-control.json >/dev/null
+          python3 -m json.tool .codex/hooks.json >/dev/null
+          python3 tools/agent_control.py doctor
+          python3 tools/agent_control.py self-test
+          python3 -m unittest \
+            tools.test_agent_control \
+            tools.test_dependabot_maintenance \
+            tools.test_project_knowledge
+
+      - name: Deployment configuration
+        run: |
+          bash -n deploy.sh
+          ansible-playbook --syntax-check -i localhost, ops/ansible/deploy.yml
+          ansible-playbook --syntax-check -i localhost, ops/ansible/host-maintenance.yml
 
       - name: Django tests
         run: python3 manage.py test web

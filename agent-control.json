@@ -1,0 +1,24 @@
+{
+  "version": 1,
+  "protected_paths": [
+    ".claude/hooks/**",
+    ".codex/**",
+    ".github/workflows/deploy.yml",
+    ".github/workflows/host-maintenance.yml",
+    "deploy.sh",
+    "ops/**",
+    "*.service",
+    "*.timer",
+    "*_nginx"
+  ],
+  "protected_command_patterns": [
+    "^(?:sudo\\s+)?([r]m|[r]mdir|[s]hred)(\\s|$)",
+    "^git\\s+(reset\\s+--hard|clean\\s+-|push\\s+.*--force)\\b",
+    "^(?:sudo\\s+)?((?:\\./)?deploy(?:\\.sh)?|terraform\\s+apply|kubectl\\s+(apply|delete)|systemctl\\s+(stop|restart)|ssh)\\b",
+    "^(?:sudo\\s+)?(drop\\s+(database|table)|truncate\\s+table|delete\\s+from)\\b"
+  ],
+  "terminal_event_required": true,
+  "urgent_override": {
+    "enabled": true
+  }
+}

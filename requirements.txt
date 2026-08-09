@@ -4,7 +4,7 @@
 
 # Risk-bearing features (accounts, 2FA, REST API) are opt-in and add their own
 # dependencies when you enable them; see the README.
-Django==6.0.6
+Django==6.1
 django-environ==0.14.0
 psycopg2-binary==2.9.12
 gunicorn==26.0.0

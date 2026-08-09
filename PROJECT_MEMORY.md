@@ -8,11 +8,12 @@ encyclopedia.
 
 - Agent behavior: `AGENTS.md`.
 - Required workflows: `docs/runbooks/`.
-- Active state: `AGENT_HANDOFF.md`.
+- Live coordination: `python3 tools/task_state.py list` (Git-local, transient).
+- Deliberately transferred unfinished work: `docs/resume/`.
 - Current durable facts: `docs/memory/`.
 - Deferred implementation plans: `docs/plans/`.
-- Historical audit trail: `CHANGELOG.md`.
-- Archived context and retired plans: `docs/site_history/`.
+- Historical audit index: `CHANGELOG.md`; structured completion entries and
+  archived context: `docs/repo_history/`.
 
 ## Topic Index
 
@@ -26,15 +27,17 @@ encyclopedia.
 
 ## Lookup Rules
 
-- Read `AGENT_HANDOFF.md` for active work and live job state.
+- Run `python3 tools/task_state.py list` for worktree scope, next action, and
+  blockers. Read a `docs/resume/` packet only for a matching transferred task.
+- Use `python3 tools/project_knowledge.py check` for topic ownership, semantic
+  Markdown, source-prose references, skill drift, and domain coverage.
 - Read only the topic file(s) relevant to the user's request.
-- Read `docs/plans/` only when the request, handoff, or a topic memory file
-  routes to a specific plan.
+- Read `docs/plans/` only when the request, task state/resume packet, or topic
+  memory routes to a specific plan.
 - Use search and code/config inspection for implementation truth.
-- Use `CHANGELOG.md` only for history, audit, or when a topic file points there.
-- Use `docs/site_history/` only for archived context, retired plans, audit, or
-  when a current memory file points to a specific historical entry.
-- Treat `Deprecated / Historical` sections as non-operative.
+- Use `CHANGELOG.md` only to route history/audit lookup; never edit it directly.
+- Use `docs/repo_history/` only for archived context, retired plans, audit, or
+  when current memory points to a specific historical entry.
 
 ## Global Current Facts
 
@@ -48,4 +51,6 @@ encyclopedia.
   and `ALLOWED_HOSTS`.
 - Secrets stay out of the repo: use `.env` locally (git-ignored) and real
   environment variables / secret stores in production.
-- Current active work, if any, is in `AGENT_HANDOFF.md`.
+- Current work, if any, is reported by `python3 tools/task_state.py list`;
+  cross-machine unfinished work exists only as an explicit `docs/resume/`
+  packet.

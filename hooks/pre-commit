@@ -9,6 +9,9 @@
 set -e
 cd "$(git rev-parse --show-toplevel)"
 
+echo "pre-commit › task-scope..."
+python3 tools/check_task_scope.py --staged
+
 echo "pre-commit › ruff..."
 ruff check .
 
@@ -20,5 +23,8 @@ python3 tools/check_security_patterns.py
 
 echo "pre-commit › memory-system..."
 python3 tools/check_memory_system.py
+
+echo "pre-commit › agent-control..."
+python3 -m unittest tools.test_agent_control tools.test_dependabot_maintenance
 
 echo "pre-commit › OK"

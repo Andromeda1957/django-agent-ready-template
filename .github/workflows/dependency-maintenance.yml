@@ -1,0 +1,41 @@
+name: Dependency Maintenance
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 16 * * 2"
+  workflow_run:
+    workflows:
+      - CI
+    types:
+      - completed
+
+permissions:
+  actions: write
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: dependency-maintenance
+  cancel-in-progress: false
+
+jobs:
+  drain:
+    name: Drain verified Dependabot updates
+    if: >-
+      github.event_name != 'workflow_run' ||
+      github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Check out current automation
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: main
+
+      - name: Process one current-base dependency update
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DEPENDENCY_BASE_BRANCH: main
+        run: python3 tools/dependabot_maintenance.py

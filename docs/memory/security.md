@@ -16,6 +16,12 @@ that touches a trust boundary, follow `docs/runbooks/security-implementation.md`
 - Python installs use pinned direct dependencies plus the checked-in
   `constraints.txt` lock/constraints file; GitHub Actions are pinned to full
   commit SHAs in CI/deploy workflows.
+- CI audits the deployed runtime requirements separately from development
+  tooling. Last verified 2026-08-09: runtime dependencies have no known
+  advisories; current Semgrep 1.172.0 pins `mcp==1.23.3`, whose MCP-server
+  advisories are not part of the deployed application. Recheck with
+  `python -m pip_audit -r requirements.txt` and review the Semgrep pin whenever
+  Dependabot proposes its next release.
 - Nginx rate limiting (`webapp_nginx`): a strict admin-login limiter (brute-force
   defense) and a global baseline flood limiter, keyed on client IP, returning
   429. `server_tokens off` hides the nginx version.
@@ -40,7 +46,7 @@ that touches a trust boundary, follow `docs/runbooks/security-implementation.md`
 ## Runbooks
 
 - Security implementation gate: `docs/runbooks/security-implementation.md`.
-- Deployment and recovery backup: `docs/runbooks/deploy-backup.md`.
+- Deployment and rollback: `docs/runbooks/deploy.md`.
 
 ## Lookup Anchors
 
@@ -48,7 +54,3 @@ that touches a trust boundary, follow `docs/runbooks/security-implementation.md`
 - Gate config: `.gitleaks.toml`, `.semgrepignore`, CI `.github/workflows/ci.yml`.
 - Example negative test: `web/tests/test_security.py`.
 - Rate limiting / web-server hardening: `webapp_nginx`.
-
-## Deprecated / Historical
-
-- None yet. Record superseded security facts here with the date they changed.

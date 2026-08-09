@@ -1,22 +1,32 @@
-# Documentation / Repo-Maintenance Change Runbook
+# Documentation And Repo-Maintenance Runbook
 
-Use for documentation, memory, runbook, or other repo-maintenance changes that do
-not alter the running site.
+Use for docs-only, memory-system, runbook, task-state, history, or repo
+maintenance changes that do not affect the running system.
 
 ## Steps
 
-1. Read `AGENT_HANDOFF.md` and any directly relevant topic memory.
-2. Make the smallest scoped change in the correct file (see
-   `docs/runbooks/task-memory-triage.md` for where things belong).
-3. If you edited `AGENTS.md`, run `python3 tools/sync_agents.py`.
-4. Run `python3 tools/check_memory_system.py`.
-5. Run `git diff --check`.
-6. Update `CHANGELOG.md`.
-7. Update or clear `AGENT_HANDOFF.md` if active state changed.
-8. Commit, and push to your GitHub remote so CI runs.
+1. Inspect `python3 tools/task_state.py list` and any matching resume packet.
+2. Read relevant topic memory/runbooks only.
+3. Before editing files, use `docs/runbooks/task-memory-triage.md`; for
+   self-contained docs fixes, proceed without tracking-memory churn.
+4. Make the scoped docs or repo-maintenance change.
+5. Run appropriate verification:
+   - `git diff --check`
+   - syntax/lint checks for any changed scripts
+   - `python3 tools/check_memory_system.py` when touching memory-system files
+   - `python3 tools/project_knowledge.py check` for semantic placement and
+     reference integrity
+6. Add one structured entry with `tools/history_log.py add`.
+7. Update or finish Git-local task state when applicable.
+8. Commit locally, push, and verify CI when the project workflow requires it.
 
-## Notes
+## No Deploy
 
-- Documentation-only changes do not require a production deploy unless they affect
-  the running site (e.g. templates, served content).
-- Do not duplicate history into `AGENT_HANDOFF.md`; that is `CHANGELOG.md`'s job.
+Documentation-only and repo-maintenance changes do not require deployment unless
+they affect runtime files or the user explicitly requests it.
+
+## No Backup Sync By Default
+
+If your project has a recovery-backup workflow, reserve it for runtime or
+deployed-system changes. Docs-only and memory-system changes do not need backup
+sync unless the user asks or the change also affects deployed behavior.

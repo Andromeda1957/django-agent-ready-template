@@ -1,0 +1,4 @@
+interface:
+  display_name: "Long-Running Project Memory"
+  short_description: "Scalable memory for long-lived projects"
+  default_prompt: "Use $long-running-project-memory to design or repair a project memory system with a compact contract, runbooks, transient task state, explicit resume packets, current topic memory, deferred plans, and separate history."

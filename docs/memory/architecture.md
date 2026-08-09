@@ -32,7 +32,3 @@ Code organization and the boundary discipline the project enforces.
 
 - Boundary contracts: `.importlinter`. Settings/apps: `config/settings.py`.
 - Example app layout: `web/`.
-
-## Deprecated / Historical
-
-- None yet. Record superseded architecture facts here with the date they changed.

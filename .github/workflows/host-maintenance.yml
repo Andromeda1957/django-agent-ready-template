@@ -1,0 +1,70 @@
+name: Host Maintenance
+
+on:
+  workflow_dispatch:
+    inputs:
+      apply_updates:
+        description: Apply all available Ubuntu package updates.
+        required: true
+        default: true
+        type: boolean
+      reboot_if_required:
+        description: Reboot when the upgrade requires it.
+        required: true
+        default: true
+        type: boolean
+  schedule:
+    - cron: "37 8 * * 0"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production-operations
+  cancel-in-progress: false
+
+jobs:
+  maintain:
+    if: github.event_name == 'workflow_dispatch' || vars.ENABLE_HOST_MAINTENANCE == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    environment: production
+    env:
+      APP_NAME: ${{ vars.APP_NAME }}
+      REMOTE_HOST: ${{ vars.REMOTE_HOST }}
+      APPLY_UPDATES: ${{ github.event_name == 'schedule' || inputs.apply_updates }}
+      REBOOT_IF_REQUIRED: ${{ github.event_name == 'schedule' || inputs.reboot_if_required }}
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.12"
+
+      - name: Install pinned Ansible
+        run: python3 -m pip install -r requirements-deploy.txt
+
+      - name: Configure strict SSH credentials
+        env:
+          PROD_SSH_PRIVATE_KEY: ${{ secrets.PROD_SSH_PRIVATE_KEY }}
+          PROD_SSH_KNOWN_HOSTS: ${{ secrets.PROD_SSH_KNOWN_HOSTS }}
+        run: |
+          test -n "$REMOTE_HOST"
+          test -n "$PROD_SSH_PRIVATE_KEY"
+          test -n "$PROD_SSH_KNOWN_HOSTS"
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$PROD_SSH_PRIVATE_KEY" > ~/.ssh/id_ed25519
+          printf '%s\n' "$PROD_SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/id_ed25519 ~/.ssh/known_hosts
+
+      - name: Patch and verify the production host
+        run: |
+          ssh_host="$REMOTE_HOST"
+          user_args=()
+          if [[ "$REMOTE_HOST" == *@* ]]; then
+            user_args=(-u "${REMOTE_HOST%%@*}")
+            ssh_host="${REMOTE_HOST#*@}"
+          fi
+          ANSIBLE_HOST_KEY_CHECKING=True ansible-playbook \
+            -i "${ssh_host}," "${user_args[@]}" ops/ansible/host-maintenance.yml

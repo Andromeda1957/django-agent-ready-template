@@ -27,7 +27,3 @@ How the frontend is structured and verified.
 
 - Templates: `web/templates/web/`. TS source: `static/web/ts/`. Compiled JS:
   `static/web/js/`. Example page: `web/templates/web/home.html`.
-
-## Deprecated / Historical
-
-- None yet. Record superseded frontend facts here with the date they changed.

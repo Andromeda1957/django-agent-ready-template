@@ -1,0 +1,279 @@
+{
+  "version": 1,
+  "settings": {
+    "contract_max_lines": 220,
+    "coverage": "advisory",
+    "current_markdown_roots": [
+      ".agents",
+      ".claude",
+      ".codex",
+      "docs/memory",
+      "docs/plans",
+      "docs/resume",
+      "docs/runbooks"
+    ],
+    "history_roots": [
+      "docs/repo_history"
+    ],
+    "ignored_roots": [
+      ".git/",
+      "node_modules/",
+      "vendor/"
+    ],
+    "require_transaction_receipts": false,
+    "source_suffixes": [
+      ".bash",
+      ".cfg",
+      ".css",
+      ".html",
+      ".ini",
+      ".js",
+      ".json",
+      ".kt",
+      ".kts",
+      ".py",
+      ".rs",
+      ".service",
+      ".sh",
+      ".sql",
+      ".timer",
+      ".toml",
+      ".ts",
+      ".tsx",
+      ".yaml",
+      ".yml",
+      ".zsh"
+    ]
+  },
+  "topics": [
+    {
+      "anchors": [
+        "tools/project_knowledge.py",
+        "tools/sync_agents.py",
+        "tools/check_memory_system.py"
+      ],
+      "excludes": [
+        "product runtime behavior"
+      ],
+      "includes": [
+        ".agents/**",
+        ".claude/**",
+        ".codex/**",
+        "AGENTS.md",
+        "agent-control.json",
+        "CHANGELOG.md",
+        "CLAUDE.md",
+        "PROJECT_MEMORY.md",
+        "docs/memory/**",
+        "docs/plans/**",
+        "docs/repo_history/**",
+        "docs/resume/**",
+        "docs/runbooks/**",
+        "hooks/**",
+        "tools/agent_control.py",
+        "tools/check_memory_system.py",
+        "tools/check_task_scope.py",
+        "tools/history_log.py",
+        "tools/plan_lifecycle.py",
+        "tools/project_knowledge.py",
+        "tools/sync_agents.py",
+        "tools/task_state.py",
+        "tools/test_agent_control.py",
+        "tools/test_project_knowledge.py"
+      ],
+      "kind": "mechanism",
+      "ownership": "Agent contract, memory routing, task state, plans, history, skills, and memory-system enforcement.",
+      "path": "docs/memory/workflow.md",
+      "prerequisites": [],
+      "runbooks": [
+        "docs/runbooks/agent-control.md",
+        "docs/runbooks/docs-change.md",
+        "docs/runbooks/memory-maintenance.md",
+        "docs/runbooks/memory-review.md",
+        "docs/runbooks/task-state.md"
+      ],
+      "slug": "workflow",
+      "volatility": "low"
+    },
+    {
+      "anchors": [
+        ".importlinter",
+        "web/services.py"
+      ],
+      "excludes": [
+        "deployment and infrastructure"
+      ],
+      "includes": [
+        ".importlinter",
+        "config/**",
+        "manage.py",
+        "ruff.toml",
+        "web/**"
+      ],
+      "kind": "project",
+      "ownership": "Django application layout, service boundaries, and dependency direction.",
+      "path": "docs/memory/architecture.md",
+      "prerequisites": [],
+      "runbooks": [
+        "docs/runbooks/website-change.md"
+      ],
+      "slug": "architecture",
+      "volatility": "medium"
+    },
+    {
+      "anchors": [
+        "deploy.sh",
+        ".github/workflows/deploy.yml"
+      ],
+      "excludes": [
+        "application domain behavior"
+      ],
+      "includes": [
+        ".github/dependabot.yml",
+        ".github/workflows/**",
+        "deploy.sh",
+        "ops/**",
+        "requirements*.txt",
+        "constraints.txt",
+        "tools/dependabot_maintenance.py",
+        "tools/test_dependabot_maintenance.py"
+      ],
+      "kind": "project",
+      "ownership": "Build, dependency maintenance, deployment, rollback, and release verification.",
+      "path": "docs/memory/deployment.md",
+      "prerequisites": [
+        "security"
+      ],
+      "runbooks": [
+        "docs/runbooks/deploy.md",
+        "docs/runbooks/dependency-maintenance.md",
+        "docs/runbooks/host-maintenance.md"
+      ],
+      "slug": "deployment",
+      "volatility": "high"
+    },
+    {
+      "anchors": [
+        "web/templates/web/home.html",
+        "static/web/ts/main.ts"
+      ],
+      "excludes": [
+        "server provisioning"
+      ],
+      "includes": [
+        "static/**",
+        "web/templates/**"
+      ],
+      "kind": "project",
+      "ownership": "Templates, browser behavior, static assets, and visual verification.",
+      "path": "docs/memory/frontend.md",
+      "prerequisites": [
+        "typescript"
+      ],
+      "runbooks": [
+        "docs/runbooks/ui-verification.md",
+        "docs/runbooks/website-change.md"
+      ],
+      "slug": "frontend",
+      "volatility": "medium"
+    },
+    {
+      "anchors": [
+        "webapp.service",
+        "webapp_nginx"
+      ],
+      "excludes": [
+        "local development"
+      ],
+      "includes": [
+        "*.service",
+        "*.timer",
+        "*_nginx"
+      ],
+      "kind": "project",
+      "ownership": "Production host topology, service operation, and web-server configuration.",
+      "path": "docs/memory/production.md",
+      "prerequisites": [
+        "deployment",
+        "security"
+      ],
+      "runbooks": [
+        "docs/runbooks/production-ops.md"
+      ],
+      "slug": "production",
+      "volatility": "high"
+    },
+    {
+      "anchors": [
+        "config/settings.py",
+        "tools/check_security_patterns.py"
+      ],
+      "excludes": [
+        "product styling"
+      ],
+      "includes": [
+        ".gitleaks.toml",
+        ".env.example",
+        ".gitignore",
+        ".semgrepignore",
+        "config/settings.py",
+        "tools/check_security_patterns.py",
+        "web/tests/test_security.py"
+      ],
+      "kind": "project",
+      "ownership": "Security defaults, trust boundaries, secret handling, and security gates.",
+      "path": "docs/memory/security.md",
+      "prerequisites": [],
+      "runbooks": [
+        "docs/runbooks/security-implementation.md"
+      ],
+      "slug": "security",
+      "volatility": "medium"
+    },
+    {
+      "anchors": [
+        "tsconfig.json",
+        "package.json"
+      ],
+      "excludes": [
+        "Python backend behavior"
+      ],
+      "includes": [
+        "package.json",
+        "package-lock.json",
+        ".npmrc",
+        "tsconfig*.json",
+        "static/web/ts/**",
+        "static/web/js/**"
+      ],
+      "kind": "project",
+      "ownership": "TypeScript source, compiler policy, generated browser JavaScript, and Node dependencies.",
+      "path": "docs/memory/typescript.md",
+      "prerequisites": [],
+      "runbooks": [
+        "docs/runbooks/website-change.md"
+      ],
+      "slug": "typescript",
+      "volatility": "medium"
+    }
+  ],
+  "no_memory": [
+    {
+      "domain": "repository-metadata",
+      "owner": "repository",
+      "paths": [
+        "LICENSE"
+      ],
+      "reason": "Static repository metadata does not need a durable topic-memory owner."
+    },
+    {
+      "domain": "generated-or-vendored",
+      "owner": "external",
+      "paths": [
+        "node_modules/**",
+        "vendor/**"
+      ],
+      "reason": "Generated and third-party dependency trees are implementation inputs, not project memory."
+    }
+  ]
+}

@@ -23,6 +23,7 @@ node_modules/
 .semgrep/
 .mypy_cache/
 .pytest_cache/
+.deploy-artifact.*.tar.gz
 
 # OS / editor
 .DS_Store

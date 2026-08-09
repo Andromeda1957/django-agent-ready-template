@@ -1,0 +1,6 @@
+model_auto_compact_token_limit_scope = "body_after_prefix"
+experimental_compact_prompt_file = "compact-prompt.md"
+tool_output_token_limit = 12000
+
+[features]
+hooks = true

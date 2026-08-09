@@ -1,0 +1,4 @@
+# Deployment-runner tooling only. The production server does not install this.
+-c constraints.txt
+
+ansible-core==2.21.2

@@ -9,7 +9,68 @@
           },
           {
             "type": "command",
-            "command": "python3 \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/floor_gate.py record"
+            "command": "CLAUDE_HOOK_EVENT_NAME=SessionStart python3 \"$CLAUDE_PROJECT_DIR\"/tools/agent_control.py hook"
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "CLAUDE_HOOK_EVENT_NAME=UserPromptSubmit python3 \"$CLAUDE_PROJECT_DIR\"/tools/agent_control.py hook"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "CLAUDE_HOOK_EVENT_NAME=PreToolUse python3 \"$CLAUDE_PROJECT_DIR\"/tools/agent_control.py hook"
+          }
+        ]
+      },
+      {
+        "matcher": "Bash|ScheduleWakeup",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/live_wait_gate.py"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "CLAUDE_HOOK_EVENT_NAME=PostToolUse python3 \"$CLAUDE_PROJECT_DIR\"/tools/agent_control.py hook"
+          }
+        ]
+      }
+    ],
+    "PreCompact": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "CLAUDE_HOOK_EVENT_NAME=PreCompact python3 \"$CLAUDE_PROJECT_DIR\"/tools/agent_control.py hook"
+          }
+        ]
+      }
+    ],
+    "PostCompact": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "CLAUDE_HOOK_EVENT_NAME=PostCompact python3 \"$CLAUDE_PROJECT_DIR\"/tools/agent_control.py hook"
           }
         ]
       }
@@ -19,7 +80,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/floor_gate.py"
+            "command": "CLAUDE_HOOK_EVENT_NAME=Stop python3 \"$CLAUDE_PROJECT_DIR\"/tools/agent_control.py hook"
           }
         ]
       }

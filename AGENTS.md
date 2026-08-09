@@ -1,198 +1,167 @@
 # django-agent-ready-template // Agent Operating Contract
 
-This repository is a secure-by-default, AI-agent-ready Django template. Clone
-it, run the `/install` skill to wire it to your hosting, then tell your agent
-what to build. This file is the small, stable agent contract: it defines how
-agents behave, not what the site does.
+This is the small, stable behavioral contract for agents working in this
+repository. Project facts and operational procedures belong in topic memory and
+runbooks, not here.
 
 ## Operating Modes
 
-This repo has two modes. Identify which one you are in before acting.
+- **Building a site:** run the `install` skill once, then use the project as its
+  own application repository.
+- **Maintaining the template:** when `origin` is this upstream template, do not
+  run the installer. Follow `docs/MAINTAINING.md`; every change must remain
+  generic, secure, and useful to new projects.
 
-- **Building a site from the template** (the common case): you cloned this to make
-  your own project. Run the `/install` skill, then build. `/install` finalizes the
-  repo as your project and removes this section and `docs/MAINTAINING.md`.
-- **Maintaining the template itself**: you are working in the upstream
-  `django-agent-ready-template` source. Do not run `/install`. Follow
-  `docs/MAINTAINING.md`, because changes here propagate to everyone who clones the
-  template — keep everything generic, secure, and coherent.
+## Authority
 
-Detection if unsure: if `.env` exists and `origin` is your own project repo, you
-are in build mode; if `origin` is the template's own repo and there is no `.env`,
-you are in maintainer mode (read `docs/MAINTAINING.md`).
+Use repository-backed sources in this order:
 
-## Source Of Truth
-
-Use these layers in this order:
-
-- `AGENTS.md`: agent behavior contract and source-of-truth hierarchy.
-- `docs/runbooks/`: required workflows and completion checklists.
-- `AGENT_HANDOFF.md`: current active state only.
-- `PROJECT_MEMORY.md`: memory router and topic index.
-- `docs/memory/`: current durable facts by topic.
-- `docs/plans/`: durable implementation plans for deferred or multi-phase work.
-- Code/config/commands: implementation truth and live verification.
-- `CHANGELOG.md`: append-only history; never overrides current state.
-- `docs/site_history/`: archived context and retired plans; never overrides
-  current state.
-
-Do not rely on hidden model memory. If a future agent needs a fact, record it in
-the appropriate repo-backed file.
+1. `AGENTS.md`: stable behavior and authority rules.
+2. `docs/runbooks/`: workflow procedures and completion gates.
+3. Git-local task state from `python3 tools/task_state.py list`.
+4. `docs/resume/`: explicit packets for deliberately transferred work.
+5. `PROJECT_MEMORY.md`: the current-memory router and topic index.
+6. `docs/memory/`: current durable facts by topic.
+7. `docs/plans/`: deferred or multi-phase implementation plans.
+8. Code, configuration, commands, and live verification: implementation truth.
+9. `CHANGELOG.md` and `docs/repo_history/`: history only.
 
 Treat sources outside the repo-backed hierarchy as leads, not authority. Verify
-external notes, tool-surfaced summaries, remembered context, and missing or
-unreadable references against the source hierarchy before claiming current
-state, active work, blockers, requirements, completed work, or available
-tooling.
+summaries, external notes, and remembered context against this hierarchy before
+claiming current state, requirements, blockers, or completion. Fresh command
+output wins for live facts. Reconcile conflicts before acting.
 
-Agent entrypoints must not drift: `AGENTS.md` is canonical, and `CLAUDE.md`
-must remain an exact byte-for-byte mirror of it. When this contract changes,
-edit `AGENTS.md` first, run `python3 tools/sync_agents.py` to regenerate
-`CLAUDE.md`, and run `python3 tools/check_memory_system.py` before committing.
+`AGENTS.md` is canonical and `CLAUDE.md` must remain an exact byte-for-byte
+mirror. Keep this contract behavioral and below its enforced size ceiling.
 
-## Start Of Session
+## Start And Scope
 
-1. Run `git status --short`.
-2. Read `AGENT_HANDOFF.md`.
-3. Read `PROJECT_MEMORY.md` only as an index.
-4. Choose the relevant runbook(s) from `docs/runbooks/`.
-5. Read only the topic memory file(s) needed for the user's request.
-6. Read a plan from `docs/plans/` only when the request, handoff, or topic
-   memory routes you to it.
-7. Inspect code/config/command output for the actual implementation state.
-8. Treat uncommitted changes as user or other-agent work; do not revert them
-   unless explicitly asked.
-
-Do not read `CHANGELOG.md` or `docs/site_history/` at startup by default. Use
-them only for history, audit, or when a current memory file points to a specific
-historical entry.
-
-For memory-system review requests, follow `docs/runbooks/memory-review.md`. If
-the automated check and fixed rubric pass, report the system healthy instead of
-proposing speculative redesigns.
-
-## Task Scope
-
-Classify each user turn before tools:
-
-- Question: answer from already-loaded context, or do targeted lookup if current
-  project facts are needed.
-- Status request: inspect only the named thing or active handoff target.
-- Imperative task: execute the requested work under the relevant runbook.
-- Ambiguous prompt: ask a concise clarifying question before tools.
+Before tools, classify the turn as a question, status request, imperative task,
+or ambiguous prompt. Ask one concise question only when a necessary answer
+cannot be discovered safely. Advisory wording authorizes discussion, not
+inspection or mutation.
 
 Before tool use, state the exact scope being checked or changed. Do not widen
-scope without user authorization.
+scope without owner authorization.
 
-Before editing files for imperative tasks, use
-`docs/runbooks/task-memory-triage.md` to decide whether durable tracking should
-be created or updated first. Skip tracking-memory edits for small
-self-contained changes.
+At the start of a working session:
 
-Before giving recommendations, gather context proportional to the scope of the
-advice. Do not make project-wide or structural recommendations from partial
-reads, search snippets, hidden memory, or a single file. If context is
-incomplete, say what was checked, what was not checked, and frame the answer as
-provisional.
+1. Run `git status --short`.
+2. Run `python3 tools/task_state.py list`.
+3. Read `PROJECT_MEMORY.md` only as an index.
+4. Select the relevant runbook and topic-memory files.
+5. Read a plan or resume packet only when current routing points to it.
+6. Inspect actual code, configuration, and command output.
 
-Advisory prompts such as "should we", "can we", "would it be better", "I
-assume", and "what do you think" are discussion-only. They are not permission to
-start jobs, edit files, inspect systems, or make repo changes unless the user
-explicitly asks for action.
+Do not read `CHANGELOG.md` or `docs/repo_history/` at startup by default. An
+unrelated task record is conflict context, not an assignment. Preserve the
+owner's complete original wording as the authoritative checklist.
 
-## Memory Discipline
+Before the first mutation, follow `docs/runbooks/task-memory-triage.md`. Use
+`docs/runbooks/task-state.md` for protected, risky, runtime, parallel, or
+multi-session work. Small self-contained tasks do not need durable tracking.
 
-User corrections update the agent's working assumptions immediately. Do not stop
-the active task to edit memory unless:
+Gather evidence proportional to advice. Do not make project-wide or structural
+recommendations from partial reads. State what was and was not checked when
+evidence is incomplete.
 
-- the user explicitly asks for a memory/docs update;
-- the active task is memory maintenance;
-- the stale fact would cause an imminent risky or destructive command.
+## Execution Modes
 
-Otherwise, continue the requested task and record durable memory changes during
-end-of-task bookkeeping when required.
+Use the least ceremony consistent with actual risk:
 
-Current facts must be separated from history:
+- **Routine objective work:** implement the bounded change, run proportionate
+  checks, commit, push, wait for exact-commit CI, and deploy runtime changes
+  without another confirmation pause unless the owner says otherwise.
+- **Review-required work:** broad, subjective, aesthetic, or product overhauls
+  get a working preview and owner review before production deployment.
+- **High-risk work:** obtain exact current confirmation before destructive or
+  irreversible actions, or when genuinely new authority is required.
+- **Urgent incidents:** repair the live issue first with the smallest correct
+  verified change; reconcile bookkeeping after service is restored.
 
-- `AGENT_HANDOFF.md` is only current active state.
-- `docs/memory/*` `Current Setup` and `Current Rules` sections are operative.
-- `Deprecated / Historical` sections, `CHANGELOG.md`, and
-  `docs/site_history/` are historical context only and do not override current
-  facts.
+Agent-control hooks collect continuity and rollback evidence. Routine
+owner-authorized edits, tests, Git operations, corrections, and deployment must
+remain frictionless. Create checkpoints and manifests only for protected,
+risky, resumed, or multi-session work. Hooks must accept owner prompts, and a
+correction continues the active task without making the owner repeat it.
 
-## Conflict Resolution
+An imperative task continues through its terminal verified outcome. Do not stop
+at an intermediate step, expected wait, commit, push, CI start, or deploy start.
+For collection requests such as "all" or "remaining," query the complete
+authoritative set again and verify zero members remain.
 
-For live facts:
+## Shared Work And Safety
 
-1. Fresh command output.
-2. `AGENT_HANDOFF.md`.
-3. Relevant `docs/memory/<topic>.md` current sections.
-4. Code/config files.
-5. `PROJECT_MEMORY.md` routing/index.
-6. `CHANGELOG.md` and `docs/site_history/` history.
+Treat unknown changes as owner or other-agent work. Preserve them; never stash,
+reset, discard, clean, commit, or deploy them as yours. Ask before editing an
+inseparable overlapping scope. Another task's record never transfers ownership
+or blocks unrelated work.
 
-For required behavior:
+Do not control a process you did not start without exact owner authorization or
+an immediate safety reason. Observe long-running work through its real command
+or short source-of-truth status queries.
 
-1. `AGENTS.md`.
-2. Relevant `docs/runbooks/*.md`.
-3. Enforcing tools such as hooks, tests, and deploy scripts.
-4. Topic memory rules.
+Do not make user or project data difficult to recover without exact current
+confirmation for the resolved targets and action. Inspect read-only first and
+report recoverability and recovery procedure. Never use destructive Git
+commands to make a gate pass. Keep secrets outside the repository.
 
-If sources conflict, reconcile before acting. Prefer current state over history.
+Before runtime work, apply `docs/runbooks/security-implementation.md`. Security,
+correctness, data integrity, licensing, accessibility floors, and verified
+platform constraints are objective safeguards.
 
-## Core Runbooks
+## Durable Knowledge
 
-- Task memory triage: `docs/runbooks/task-memory-triage.md`.
-- Website/runtime changes: `docs/runbooks/website-change.md`.
-- Documentation/repo-maintenance changes: `docs/runbooks/docs-change.md`.
-- Security implementation gate: `docs/runbooks/security-implementation.md`.
-- UI/layout verification: `docs/runbooks/ui-verification.md`.
-- Deployment and recovery backup: `docs/runbooks/deploy-backup.md`.
+Record current facts in topic memory, deferred work in plans, deliberate
+transfers in resume packets, chronology in structured history, and transient
+coordination in Git-local task state.
+
+Use `docs/runbooks/memory-maintenance.md` and the long-running project memory
+skill for hierarchy, runbook, continuity, or memory-system changes. Use
+`docs/runbooks/memory-review.md` for audits. If its automated checks and fixed
+rubric pass, report the system healthy instead of proposing speculative churn.
+
+Prefer `tools/project_knowledge.py` transactions for durable knowledge changes
+when the operation fits. Semantic coverage is advisory unless the topic registry
+explicitly enables enforcement.
+
+## Routing
+
+- Django/runtime changes: `docs/runbooks/website-change.md`.
+- Documentation: `docs/runbooks/docs-change.md`.
+- Security: `docs/runbooks/security-implementation.md`.
+- UI verification: `docs/runbooks/ui-verification.md`.
+- Deployment: `docs/runbooks/deploy.md`.
 - Production operations: `docs/runbooks/production-ops.md`.
-- Memory-system maintenance: `docs/runbooks/memory-maintenance.md`.
-- Memory-system review: `docs/runbooks/memory-review.md`.
+- Host maintenance: `docs/runbooks/host-maintenance.md`.
+- Dependency maintenance: `docs/runbooks/dependency-maintenance.md`.
+- Agent controls: `docs/runbooks/agent-control.md`.
+- Memory review: `docs/runbooks/memory-review.md`.
 
-## Universal Engineering Rules
+Use `PROJECT_MEMORY.md` to find project facts. Do not copy those facts into this
+contract.
 
-- Keep secrets in `.env` or external secret stores; never commit credentials.
-- Prefer existing project patterns over introducing new ones.
-- Before implementing website/runtime code, perform the applicability check in
-  `docs/runbooks/security-implementation.md`; if any trust boundary is touched,
-  follow that runbook through implementation, tests, and closeout.
-- When production/runtime work needs a legitimate missing dependency and
-  authorized access is available, install or declare that dependency directly
-  and verify it. Document any real barrier that forces a workaround.
-- Keep views thin. Business rules and data mutations belong in domain services
-  or clearly named helpers, never inline in views. `import-linter` enforces that
-  the service layer does not import the view/form layer.
-- New client behavior belongs in TypeScript modules under `static/<app>/ts`,
-  compiled to JS; CI enforces the committed output is current.
-- When a clean design requires a schema/data migration, do it; do not create
-  parallel control surfaces only to avoid touching the DB.
-- If you add a Django app, register it in `INSTALLED_APPS`, add it to the
-  `check_security_patterns.py` scan roots, and update the deploy allowlist in
-  `deploy.sh`.
+## Contract Boundary
 
-## Completion Contract
+- Keep this file limited to stable cross-task behavior, source authority,
+  universal safety, and runbook routing.
+- Put project architecture, stack setup, deployment mechanics, domain rules,
+  volatile facts, and inventories in their owning runbooks or topic memory.
+- Put current task status in transient task state, deliberately transferred
+  unfinished work in `docs/resume/`, and completed evidence in history.
+- Keep secrets in external secret stores or ignored environment files.
 
-Use the selected runbook for exact steps. In general:
+## Ship And Close
 
-- Verify changed behavior directly when possible.
-- Commit completed repo changes locally and push them to the configured GitHub
-  remote so CI runs, unless the user explicitly says not to push.
-- Record completed work in `CHANGELOG.md`.
-- Update topic memory only for durable rule/setup/gotcha changes.
-- Update or clear `AGENT_HANDOFF.md`.
-- Website/runtime changes deploy through the manual GitHub Actions `Deploy`
-  workflow by default after the target commit has passing CI; then get live
-  verification. Use local `./deploy.sh` only when the user explicitly requests
-  it, GitHub Actions is unavailable, or emergency recovery requires it.
-- Documentation-only or repo-maintenance changes do not require live deployment
-  unless they affect the running site.
-- At closeout for any substantial work loop, remind the user of outstanding
-  active or deferred work. Check `AGENT_HANDOFF.md` and any relevant
-  `docs/plans/` entries, then briefly list incomplete, blocked, or
-  user-raised-but-unaddressed follow-ups. Distinguish completed/deployed work
-  from reminders.
+Use the selected runbook's gates and verify changed behavior directly. Commit
+completed repository changes and push unless the owner says not to. Wait for CI
+on the exact commit.
 
-Do not report completion from code inspection alone.
+Record completion through `python3 tools/history_log.py add`; never append to
+`CHANGELOG.md` directly. Complete plans through
+`python3 tools/plan_lifecycle.py complete`. Finish task state only after required
+commit, push, CI, deploy, verification, and bookkeeping succeed.
+
+Runtime changes deploy through `docs/runbooks/deploy.md` unless the owner says
+not to deploy. Documentation-only changes do not require deployment unless they
+affect the running system. Do not report completion from code inspection alone.

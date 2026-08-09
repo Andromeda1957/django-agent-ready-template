@@ -1,0 +1,99 @@
+{
+  "description": "Portable checkpoint, authorization, and completion controls.",
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup|resume|clear|compact",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "AGENT_CONTROL_EVENT=codex python3 \"$(git rev-parse --show-toplevel)/tools/agent_control.py\" hook",
+            "timeout": 15,
+            "additionalContextLimit": 2200
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "AGENT_CONTROL_EVENT=codex python3 \"$(git rev-parse --show-toplevel)/tools/agent_control.py\" hook",
+            "timeout": 15,
+            "additionalContextLimit": 1000
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "AGENT_CONTROL_EVENT=codex python3 \"$(git rev-parse --show-toplevel)/tools/agent_control.py\" hook",
+            "timeout": 30
+          }
+        ]
+      },
+      {
+        "matcher": "Bash|ScheduleWakeup",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "AGENT_CONTROL_EVENT=codex python3 \"$(git rev-parse --show-toplevel)/.claude/hooks/live_wait_gate.py\"",
+            "timeout": 15
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "AGENT_CONTROL_EVENT=codex python3 \"$(git rev-parse --show-toplevel)/tools/agent_control.py\" hook",
+            "timeout": 30
+          }
+        ]
+      }
+    ],
+    "PreCompact": [
+      {
+        "matcher": "manual|auto",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "AGENT_CONTROL_EVENT=codex python3 \"$(git rev-parse --show-toplevel)/tools/agent_control.py\" hook",
+            "timeout": 15
+          }
+        ]
+      }
+    ],
+    "PostCompact": [
+      {
+        "matcher": "manual|auto",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "AGENT_CONTROL_EVENT=codex python3 \"$(git rev-parse --show-toplevel)/tools/agent_control.py\" hook",
+            "timeout": 15
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "AGENT_CONTROL_EVENT=codex python3 \"$(git rev-parse --show-toplevel)/tools/agent_control.py\" hook",
+            "timeout": 30
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -1,134 +1,103 @@
 """Validate the project memory-system shape.
 
-This is the gate that keeps the agent operating contract, runbooks, and topic
-memory internally consistent and free of rot. It enforces structure, not
-content: required files exist, the handoff holds only current state, topic memory
-follows the standard section shape, the contract routes to the right runbooks,
-AGENTS.md and CLAUDE.md stay byte-identical, and the security gate is wired into
-every place it must run. Run it locally and in CI.
+Generic, dependency-free shape check for the long-running-project-memory
+layout. Run from anywhere; it resolves the repo root as the parent of this
+file's directory (this script lives in <repo>/tools/).
+
+Exit code 0 and "memory-system check passed" mean the structural invariants
+hold. Any failure raises SystemExit(1) with a message naming the problem.
 """
 
 from __future__ import annotations
 
 import json
 import re
+import sys
 from pathlib import Path
+
+sys.dont_write_bytecode = True
+
+import history_log  # noqa: E402
+import plan_lifecycle  # noqa: E402
+import project_knowledge  # noqa: E402
+import task_state  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[1]
 
 REQUIRED_FILES = [
     'AGENTS.md',
     'CLAUDE.md',
-    '.github/workflows/ci.yml',
     '.claude/settings.json',
+    '.claude/settings.agent-control.json',
     '.claude/hooks/session-start-context.sh',
+    '.claude/hooks/live_wait_gate.py',
     '.claude/skills/long-running-project-memory/SKILL.md',
+    '.agents/skills/long-running-project-memory/SKILL.md',
+    '.agents/skills/long-running-project-memory/agents/openai.yaml',
+    '.agents/skills/long-running-project-memory/references/memory-system-pattern.md',
+    '.codex/config.toml',
+    '.codex/hooks.json',
+    '.codex/compact-prompt.md',
+    'agent-control.json',
     'PROJECT_MEMORY.md',
-    'AGENT_HANDOFF.md',
+    'CHANGELOG.md',
+    'docs/resume/README.md',
+    'docs/memory/topics.json',
     'docs/memory/workflow.md',
-    'docs/memory/deployment.md',
-    'docs/memory/production.md',
-    'docs/memory/frontend.md',
-    'docs/memory/security.md',
-    'docs/memory/architecture.md',
-    'docs/memory/typescript.md',
     'docs/plans/README.md',
-    'docs/site_history/README.md',
-    'deploy.sh',
+    'docs/repo_history/README.md',
+    'docs/repo_history/changelog/README.md',
+    'docs/repo_history/completed-plans/README.md',
     'docs/runbooks/task-memory-triage.md',
-    'docs/runbooks/website-change.md',
+    'docs/runbooks/task-state.md',
+    'docs/runbooks/agent-control.md',
+    'docs/runbooks/dependency-maintenance.md',
+    'docs/runbooks/deploy.md',
+    'docs/runbooks/host-maintenance.md',
     'docs/runbooks/docs-change.md',
-    'docs/runbooks/security-implementation.md',
-    'docs/runbooks/ui-verification.md',
-    'docs/runbooks/deploy-backup.md',
-    'docs/runbooks/production-ops.md',
     'docs/runbooks/memory-maintenance.md',
     'docs/runbooks/memory-review.md',
     'hooks/pre-commit',
-    'tools/check_security_patterns.py',
+    'tools/task_state.py',
+    'tools/agent_control.py',
+    'tools/test_agent_control.py',
+    'tools/dependabot_maintenance.py',
+    'tools/test_dependabot_maintenance.py',
+    'tools/project_knowledge.py',
+    'tools/test_project_knowledge.py',
+    'tools/check_task_scope.py',
+    'tools/plan_lifecycle.py',
+    'tools/history_log.py',
 ]
-
-# The handoff is current-state only. These headings signal history has leaked in.
-FORBIDDEN_HANDOFF_HEADINGS = [
-    '## Latest Completed',
-    '## Changelog',
-    '## Completed History',
-    '## Deferred Follow-ups',
-]
-
-ALLOWED_HANDOFF_HEADINGS = {
-    '# Agent Handoff',
-    '## Active State Summary',
-}
-
-HANDOFF_HISTORY_PATTERNS = [
-    r'\bdone\s*\+\s*deployed\b',
-    r'\bcomplete\s*/\s*deployed\b',
-    r'\bcompleted\s*/\s*deployed\b',
-    r'\bdeployed\s*\+\s*live-verified\b',
-    r'\blive-verified\b',
-    r'\bdeployed via\b',
-    r'\bshipped latest\b',
-    r'\bdetail(?:s)? in changelog\b',
-    r'\bsee changelog\b',
-    r'\bdone end to end\b',
-    r'\bno longer deferred\b',
-    r'\bcommit(?:ted)?\s+(?:repo\s+)?state\b',
-]
-
-HANDOFF_DEPLOY_RUN_PATTERN = re.compile(r'\bdeploy run\b', re.IGNORECASE)
-ACTIVE_DEPLOY_WORDS = (
-    'active',
-    'blocked',
-    'failed',
-    'in progress',
-    'pending',
-    'running',
-    'waiting',
-)
 
 REQUIRED_TOPIC_SECTIONS = [
     '## Current Setup',
     '## Current Rules',
     '## Runbooks',
     '## Lookup Anchors',
-    '## Deprecated / Historical',
 ]
 
-MAX_HANDOFF_LINES = 120
-
-DATED_CURRENT_PATTERN = re.compile(r'\bas of\s+\d{4}-\d{2}-\d{2}\b', re.IGNORECASE)
-LAST_VERIFIED_PATTERN = re.compile(r'\bLast verified\s+\d{4}-\d{2}-\d{2}\b')
-NUMBER_PATTERN = re.compile(r'\b\d{2,3}(?:,\d{3})*\b')
-
-# Topic files where a Current Setup count is volatile and must carry a
-# "Last verified YYYY-MM-DD" date. Map "docs/memory/<topic>.md" -> matching terms.
-# The base template ships with none; add your own as your memory grows.
-VOLATILE_COUNT_TERMS: dict[str, tuple[str, ...]] = {}
+FORBIDDEN_TOPIC_HEADINGS = re.compile(
+    r'^##\s+(?:Deprecated|Historical|History|Completed|Shipped|Deployed)\b',
+    re.IGNORECASE | re.MULTILINE,
+)
 
 REQUIRED_MEMORY_REVIEW_PHRASES = [
     'Do not propose structural memory revisions when checks pass',
-    'If the automated check passes and no rubric item fails',
+    'If the automated checks pass and no rubric item fails',
+    'whole relevant memory system',
 ]
 
-CLAUDE_STARTUP_HOOK_COMMAND = '"$CLAUDE_PROJECT_DIR"/.claude/hooks/session-start-context.sh'
-
-REQUIRED_SECURITY_RUNBOOK_PHRASES = [
-    'Applicability Check',
-    'Banned By Default',
-    'Approved Patterns',
-    'Required Negative Tests',
-    'Static Gate',
-    'Closeout',
-    'RCE',
-    'SQLi',
-    'IDOR',
-    'CSRF',
-    'XSS',
-    'open redirect',
-    'SSTI',
-    'SSRF',
-]
+STARTUP_HOOK_COMMAND = '"$CLAUDE_PROJECT_DIR"/.claude/hooks/session-start-context.sh'
+MAX_AGENT_CONTRACT_LINES = 220
+CURRENT_MARKDOWN_ROOTS = (
+    '.agents',
+    '.claude',
+    'docs/memory',
+    'docs/plans',
+    'docs/resume',
+    'docs/runbooks',
+)
 
 
 def read(path: str) -> str:
@@ -139,46 +108,11 @@ def compact(text: str) -> str:
     return ' '.join(text.split())
 
 
-def markdown_section(text: str, heading: str) -> str:
-    lines = text.splitlines()
-    selected: list[str] = []
-    in_section = False
-    for line in lines:
-        if line.startswith('## '):
-            if in_section:
-                break
-            in_section = line == heading
-            continue
-        if in_section:
-            selected.append(line)
-    return '\n'.join(selected)
-
-
-def bullet_blocks(section: str) -> list[str]:
-    blocks: list[str] = []
-    current: list[str] = []
-    for line in section.splitlines():
-        if line.startswith('- '):
-            if current:
-                blocks.append('\n'.join(current))
-            current = [line]
-            continue
-        if current and (line.startswith('  ') or not line.strip()):
-            current.append(line)
-            continue
-        if current:
-            blocks.append('\n'.join(current))
-            current = []
-    if current:
-        blocks.append('\n'.join(current))
-    return blocks
-
-
 def fail(message: str) -> None:
     raise SystemExit(f'memory-system check failed: {message}')
 
 
-def require_claude_startup_hook() -> None:
+def require_startup_hook() -> None:
     settings_path = ROOT / '.claude' / 'settings.json'
     try:
         settings = json.loads(settings_path.read_text(encoding='utf-8'))
@@ -198,102 +132,57 @@ def require_claude_startup_hook() -> None:
                 continue
             if (
                 hook.get('type') == 'command'
-                and hook.get('command') == CLAUDE_STARTUP_HOOK_COMMAND
+                and hook.get('command') == STARTUP_HOOK_COMMAND
             ):
                 has_startup_hook = True
 
     if not has_startup_hook:
-        fail('.claude/settings.json must register the Claude SessionStart context hook')
+        fail('.claude/settings.json must register the SessionStart context hook')
 
     script_path = ROOT / '.claude' / 'hooks' / 'session-start-context.sh'
     if not script_path.stat().st_mode & 0o111:
         fail('.claude/hooks/session-start-context.sh must be executable')
 
     script = script_path.read_text(encoding='utf-8')
-    for required_file in ('AGENTS.md', 'AGENT_HANDOFF.md', 'PROJECT_MEMORY.md'):
+    for required_file in ('AGENTS.md', 'PROJECT_MEMORY.md', 'tools/task_state.py'):
         if required_file not in script:
-            fail(f'Claude SessionStart hook must inject {required_file}')
+            fail(f'SessionStart hook must inject {required_file}')
     if 'Before any tool use' not in script:
-        fail('Claude SessionStart hook must remind Claude to classify before tool use')
+        fail('SessionStart hook must remind the agent to classify before tool use')
 
 
-def require_handoff_current_state(handoff: str) -> None:
-    handoff_lines = handoff.splitlines()
-    if len(handoff_lines) > MAX_HANDOFF_LINES:
-        fail(f'AGENT_HANDOFF.md has {len(handoff_lines)} lines; max is {MAX_HANDOFF_LINES}')
-
-    for line in handoff_lines:
-        if not line.startswith('#'):
-            continue
-        if line not in ALLOWED_HANDOFF_HEADINGS:
-            fail(
-                'AGENT_HANDOFF.md must use only the standard active-state '
-                f'headings; found {line!r}'
-            )
-
-    for heading in FORBIDDEN_HANDOFF_HEADINGS:
-        if heading in handoff:
-            fail(f'AGENT_HANDOFF.md contains forbidden heading {heading!r}')
-
-    compacted = compact(handoff).lower()
-    for pattern in HANDOFF_HISTORY_PATTERNS:
-        if re.search(pattern, compacted):
-            fail(
-                'AGENT_HANDOFF.md appears to contain completed-work history '
-                f'matching /{pattern}/'
-            )
-
-    for line_no, line in enumerate(handoff_lines, start=1):
-        lowered = line.lower()
-        if not HANDOFF_DEPLOY_RUN_PATTERN.search(lowered):
-            continue
-        if not any(word in lowered for word in ACTIVE_DEPLOY_WORDS):
-            fail(
-                'AGENT_HANDOFF.md references a deploy run without active '
-                f'state context on line {line_no}'
-            )
+def routed_markdown(text: str, prefix: str) -> set[str]:
+    text = re.sub(r'<!--.*?-->', '', text, flags=re.DOTALL)
+    return {
+        match.group(1) for match in re.finditer(r'`([^`]+\.md)`', text)
+        if match.group(1).startswith(prefix)
+    }
 
 
-def require_project_memory_routes_all_topics(project_memory: str) -> None:
-    for topic_path in sorted((ROOT / 'docs/memory').glob('*.md')):
-        relative = str(topic_path.relative_to(ROOT))
-        if relative not in project_memory:
-            fail(f'PROJECT_MEMORY.md must route topic memory file {relative}')
+def current_markdown_paths() -> list[Path]:
+    paths = [ROOT / 'AGENTS.md', ROOT / 'CLAUDE.md', ROOT / 'PROJECT_MEMORY.md']
+    for directory in CURRENT_MARKDOWN_ROOTS:
+        paths.extend((ROOT / directory).rglob('*.md'))
+    return sorted({path for path in paths if path.is_file()})
 
 
-def require_plan_readme_indexes_all_plans(plans_readme: str) -> None:
-    for plan_path in sorted((ROOT / 'docs/plans').glob('*.md')):
-        if plan_path.name == 'README.md':
-            continue
-        if plan_path.name not in plans_readme:
-            fail(f'docs/plans/README.md must index {plan_path.name}')
+def require_current_markdown_hygiene() -> None:
+    handoff_path = ROOT / 'AGENT_HANDOFF.md'
+    if handoff_path.exists():
+        fail('static AGENT_HANDOFF.md is retired; preserve useful content in history')
 
+    duplicates: dict[str, list[str]] = {}
+    for path in current_markdown_paths():
+        relative = str(path.relative_to(ROOT))
+        text = path.read_text(encoding='utf-8')
+        if 'AGENT_HANDOFF.md' in text:
+            fail(f'{relative} still routes the retired static handoff file')
+        duplicates.setdefault(text, []).append(relative)
 
-def require_current_setup_dates_are_verified(topic_path: Path, text: str) -> None:
-    current_setup = markdown_section(text, '## Current Setup')
-    for block in bullet_blocks(current_setup):
-        if DATED_CURRENT_PATTERN.search(block) and not LAST_VERIFIED_PATTERN.search(block):
-            fail(
-                f'{topic_path.relative_to(ROOT)} has an "as of" date in '
-                'Current Setup without "Last verified YYYY-MM-DD" wording'
-            )
-
-
-def require_volatile_counts_are_verified(topic_path: Path, text: str) -> None:
-    relative = str(topic_path.relative_to(ROOT))
-    terms = VOLATILE_COUNT_TERMS.get(relative)
-    if not terms:
-        return
-    current_setup = markdown_section(text, '## Current Setup')
-    for block in bullet_blocks(current_setup):
-        lowered = block.lower()
-        if not any(term in lowered for term in terms):
-            continue
-        if NUMBER_PATTERN.search(block) and not LAST_VERIFIED_PATTERN.search(block):
-            fail(
-                f'{relative} has volatile Current Setup counts without '
-                '"Last verified YYYY-MM-DD" wording'
-            )
+    allowed_mirror = {'AGENTS.md', 'CLAUDE.md'}
+    for matching_paths in duplicates.values():
+        if len(matching_paths) > 1 and set(matching_paths) != allowed_mirror:
+            fail(f'duplicate current Markdown should have one owner: {matching_paths}')
 
 
 def main() -> None:
@@ -301,45 +190,82 @@ def main() -> None:
     if missing:
         fail(f'missing required memory/runbook files: {", ".join(missing)}')
 
-    handoff = read('AGENT_HANDOFF.md')
-    require_handoff_current_state(handoff)
+    require_current_markdown_hygiene()
 
     project_memory = read('PROJECT_MEMORY.md')
-    if 'docs/site_history/' not in project_memory:
-        fail('PROJECT_MEMORY.md must route archived historical context')
     if 'This file is the memory router' not in project_memory:
         fail('PROJECT_MEMORY.md must remain a routing/index file')
     if 'docs/plans/' not in project_memory:
         fail('PROJECT_MEMORY.md must route deferred implementation plans')
-    require_project_memory_routes_all_topics(project_memory)
+    if 'docs/repo_history/' not in project_memory:
+        fail('PROJECT_MEMORY.md must route archived repository history')
+    if (
+        'docs/resume/' not in project_memory
+        or 'tools/task_state.py list' not in project_memory
+    ):
+        fail('PROJECT_MEMORY.md must route task state and explicit resume packets')
 
-    for topic_path in (ROOT / 'docs/memory').glob('*.md'):
-        text = topic_path.read_text(encoding='utf-8')
-        missing_sections = [section for section in REQUIRED_TOPIC_SECTIONS if section not in text]
-        if missing_sections:
-            fail(f'{topic_path.relative_to(ROOT)} missing sections: {", ".join(missing_sections)}')
-        require_current_setup_dates_are_verified(topic_path, text)
-        require_volatile_counts_are_verified(topic_path, text)
+    memory_dir = ROOT / 'docs' / 'memory'
+    if memory_dir.is_dir():
+        for topic_path in memory_dir.glob('*.md'):
+            # README and underscore-prefixed templates are not topic files.
+            if topic_path.name == 'README.md' or topic_path.name.startswith('_'):
+                continue
+            text = topic_path.read_text(encoding='utf-8')
+            missing_sections = [s for s in REQUIRED_TOPIC_SECTIONS if s not in text]
+            if missing_sections:
+                fail(
+                    f'{topic_path.relative_to(ROOT)} missing sections: '
+                    f'{", ".join(missing_sections)}'
+                )
+            if FORBIDDEN_TOPIC_HEADINGS.search(text):
+                fail(f'{topic_path.relative_to(ROOT)} must remain current-only')
+
+    topic_files = {
+        str(path.relative_to(ROOT)) for path in memory_dir.glob('*.md')
+        if path.name != 'README.md' and not path.name.startswith('_')
+    }
+    routed_topics = routed_markdown(project_memory, 'docs/memory/')
+    if topic_files != routed_topics:
+        fail(
+            'PROJECT_MEMORY.md topic routing mismatch: '
+            f'missing={sorted(topic_files - routed_topics)}, '
+            f'stale={sorted(routed_topics - topic_files)}'
+        )
 
     agents = read('AGENTS.md')
-    if 'Do not read `CHANGELOG.md` or `docs/site_history/` at startup by default.' not in agents:
-        fail('AGENTS.md must keep history archives out of default startup reads')
+    if len(agents.splitlines()) > MAX_AGENT_CONTRACT_LINES:
+        fail(
+            f'AGENTS.md exceeds the {MAX_AGENT_CONTRACT_LINES}-line behavior-contract ceiling; '
+            'move project setup, workflows, and history to their owning layers'
+        )
+    if (
+        '## Contract Boundary' not in agents
+        or 'Put project architecture, stack setup, deployment mechanics' not in compact(agents)
+    ):
+        fail('AGENTS.md must keep project setup and history outside the behavior contract')
+    if (
+        'Do not read `CHANGELOG.md` or `docs/repo_history/` at startup by default.'
+        not in agents
+    ):
+        fail('AGENTS.md must keep changelog and repo history out of default startup reads')
+    if 'docs/repo_history/' not in agents:
+        fail('AGENTS.md must include the archived repository history layer')
     if 'docs/runbooks/memory-review.md' not in agents:
         fail('AGENTS.md must route memory reviews to docs/runbooks/memory-review.md')
-    if 'docs/runbooks/security-implementation.md' not in agents:
-        fail('AGENTS.md must route runtime security work to security-implementation.md')
-    if 'docs/site_history/' not in agents:
-        fail('AGENTS.md must include the site-history archive layer')
     if 'Do not make project-wide or structural recommendations from partial reads' not in compact(agents):
         fail('AGENTS.md must require proportional context before broad advice')
+    if 'Treat sources outside the repo-backed hierarchy as leads' not in agents:
+        fail('AGENTS.md must keep the repo-backed source authority rule')
+    for phrase in ('tools/task_state.py list', 'docs/resume/', 'tools/history_log.py add'):
+        if phrase not in agents:
+            fail(f'AGENTS.md must include current lifecycle anchor {phrase!r}')
 
     claude = read('CLAUDE.md')
     if claude != agents:
         fail('CLAUDE.md must be an exact byte-for-byte mirror of AGENTS.md')
-    if 'Treat sources outside the repo-backed hierarchy as leads' not in claude:
-        fail('CLAUDE.md must keep the repo-backed source authority rule')
 
-    require_claude_startup_hook()
+    require_startup_hook()
 
     memory_review = read('docs/runbooks/memory-review.md')
     for phrase in REQUIRED_MEMORY_REVIEW_PHRASES:
@@ -347,81 +273,90 @@ def main() -> None:
             fail(f'memory-review runbook missing anti-churn phrase: {phrase!r}')
     if 'whole relevant memory system' not in memory_review:
         fail('memory-review runbook must require full relevant context for structural advice')
-
-    security_runbook = read('docs/runbooks/security-implementation.md')
-    for phrase in REQUIRED_SECURITY_RUNBOOK_PHRASES:
-        if phrase not in security_runbook:
-            fail(f'security implementation runbook missing required phrase: {phrase!r}')
-
-    website_change = read('docs/runbooks/website-change.md')
-    if 'docs/runbooks/security-implementation.md' not in website_change:
-        fail('website-change runbook must require the security implementation gate')
-    if 'python3 tools/check_security_patterns.py' not in website_change:
-        fail('website-change runbook must run the security pattern checker')
-
-    deploy_backup = read('docs/runbooks/deploy-backup.md')
-    if 'python3 tools/check_security_patterns.py' not in deploy_backup:
-        fail('deploy-backup runbook must include the security pattern checker')
-
-    pre_commit = read('hooks/pre-commit')
-    if 'python3 tools/check_security_patterns.py' not in pre_commit:
-        fail('pre-commit hook must run the security pattern checker')
-
-    ci = read('.github/workflows/ci.yml')
-    if 'python3 tools/check_security_patterns.py' not in ci:
-        fail('GitHub CI must run the security pattern checker')
-
-    deploy_script = read('deploy.sh')
-    if 'python3 tools/check_security_patterns.py' not in deploy_script:
-        fail('deploy.sh must run the security pattern checker before transfer')
+    if 'docs/repo_history/' not in memory_review:
+        fail('memory-review runbook must route retired records to docs/repo_history/')
 
     workflow = read('docs/memory/workflow.md')
     if '## Accepted Baseline / Known Tradeoffs' not in workflow:
         fail('workflow memory must record accepted baseline/tradeoffs')
     if 'docs/plans/' not in workflow:
         fail('workflow memory must include the plans layer')
-    if 'docs/site_history/' not in workflow:
-        fail('workflow memory must include the site-history archive layer')
-    if 'docs/runbooks/security-implementation.md' not in workflow:
-        fail('workflow memory must route the security implementation runbook')
+    if 'docs/repo_history/' not in workflow:
+        fail('workflow memory must include the repo-history archive layer')
 
-    security_memory = read('docs/memory/security.md')
-    if 'docs/runbooks/security-implementation.md' not in security_memory:
-        fail('security memory must route the security implementation runbook')
-    if 'tools/check_security_patterns.py' not in security_memory:
-        fail('security memory must route the security pattern checker')
-
-    local_memory_skill = read('.claude/skills/long-running-project-memory/SKILL.md')
-    if 'docs/plans/' not in local_memory_skill:
+    local_claude_skill = read('.claude/skills/long-running-project-memory/SKILL.md')
+    if 'docs/plans/' not in local_claude_skill:
         fail('Claude long-running memory skill must include docs/plans/')
-    if 'docs/site_history/' not in local_memory_skill:
-        fail('Claude long-running memory skill must include docs/site_history/')
+    if 'docs/repo_history/' not in local_claude_skill:
+        fail('Claude long-running memory skill must include docs/repo_history/')
 
+    local_codex_skill = read('.agents/skills/long-running-project-memory/SKILL.md')
+    if 'Plans' not in local_codex_skill or 'History' not in local_codex_skill:
+        fail('Codex long-running memory skill must include plans and history layers')
+    if 'transient task state' not in local_codex_skill.lower():
+        fail('Codex long-running memory skill must include transient task state')
+
+    if (ROOT / '.codex' / 'skills').exists():
+        fail('Codex repo-scoped skills belong under .agents/skills/, not .codex/skills/')
+
+    plan_index = read('docs/plans/README.md')
+    plan_files = set()
     for plan_path in (ROOT / 'docs/plans').glob('*.md'):
         text = plan_path.read_text(encoding='utf-8')
         if 'historical record only' in text.lower():
             fail(
                 f'{plan_path.relative_to(ROOT)} is a historical record; '
-                'move it to docs/site_history/'
+                'move it to docs/repo_history/'
             )
         if plan_path.name == 'README.md' and '## Completed Records' in text:
             fail('docs/plans/README.md must not keep a Completed Records section')
-        if plan_path.name == 'README.md':
-            require_plan_readme_indexes_all_plans(text)
+        if plan_path.name != 'README.md':
+            plan_files.add(plan_path.name)
+    indexed_plans = {
+        Path(path).name for path in routed_markdown(plan_index, '')
+        if '/' not in path and path != 'README.md'
+    }
+    if plan_files != indexed_plans:
+        fail(
+            'docs/plans/README.md routing mismatch: '
+            f'missing={sorted(plan_files - indexed_plans)}, '
+            f'stale={sorted(indexed_plans - plan_files)}'
+        )
 
-    claude_skills = ROOT / '.claude' / 'skills'
-    if claude_skills.is_dir():
-        for skill_path in claude_skills.glob('*/SKILL.md'):
-            lines = skill_path.read_text(encoding='utf-8').splitlines()
-            for idx, line in enumerate(lines):
-                if 'Session start' not in line:
-                    continue
-                snippet = '\n'.join(lines[idx:idx + 5])
-                if 'CHANGELOG.md' in snippet and 'Do not read `CHANGELOG.md` by default' not in snippet:
-                    fail(
-                        f'{skill_path.relative_to(ROOT)} tells agents to read '
-                        'CHANGELOG.md at session start'
-                    )
+    for packet in sorted((ROOT / 'docs' / 'resume').glob('*.md')):
+        if packet.name != 'README.md':
+            try:
+                task_state.parse_packet(packet)
+            except task_state.TaskStateError as exc:
+                fail(str(exc))
+
+    for executable in (
+        '.claude/hooks/session-start-context.sh',
+        '.claude/hooks/live_wait_gate.py',
+        'hooks/pre-commit',
+        'tools/check_memory_system.py',
+        'tools/check_task_scope.py',
+        'tools/history_log.py',
+        'tools/plan_lifecycle.py',
+        'tools/project_knowledge.py',
+        'tools/test_project_knowledge.py',
+        'tools/task_state.py',
+        'tools/agent_control.py',
+        'tools/test_agent_control.py',
+    ):
+        if not (ROOT / executable).stat().st_mode & 0o111:
+            fail(f'{executable} must be executable')
+
+    try:
+        plan_lifecycle.validate_all()
+        history_log.check()
+        project_knowledge.check()
+    except (
+        plan_lifecycle.PlanError,
+        history_log.HistoryError,
+        project_knowledge.KnowledgeError,
+    ) as exc:
+        fail(str(exc).replace(f'{ROOT}/', ''))
 
     print('memory-system check passed')
 

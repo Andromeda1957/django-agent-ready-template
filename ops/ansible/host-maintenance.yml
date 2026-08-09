@@ -1,0 +1,84 @@
+---
+- name: Patch and verify the Django production host
+  hosts: all
+  become: true
+  gather_facts: true
+
+  vars:
+    app_name: "{{ lookup('env', 'APP_NAME') }}"
+    apply_updates: "{{ lookup('env', 'APPLY_UPDATES') | default('false', true) | bool }}"
+    reboot_if_required: "{{ lookup('env', 'REBOOT_IF_REQUIRED') | default('false', true) | bool }}"
+
+  pre_tasks:
+    - name: Require a supported host declaration
+      ansible.builtin.assert:
+        that:
+          - ansible_facts.distribution == 'Ubuntu'
+          - app_name is match('^[a-z][a-z0-9_-]{1,39}$')
+
+  tasks:
+    - name: Keep unattended security updates configured
+      ansible.builtin.apt:
+        name: [unattended-upgrades, ubuntu-release-upgrader-core]
+        state: present
+        update_cache: true
+        cache_valid_time: 3600
+        lock_timeout: 600
+
+    - name: Keep apt maintenance timers enabled
+      ansible.builtin.systemd_service:
+        name: "{{ item }}"
+        enabled: true
+        state: started
+      loop: [apt-daily.timer, apt-daily-upgrade.timer]
+
+    - name: Apply all available package updates
+      ansible.builtin.apt:
+        update_cache: true
+        upgrade: dist
+        autoremove: false
+        autoclean: false
+        dpkg_options: force-confdef,force-confold
+        lock_timeout: 1200
+      when: apply_updates
+
+    - name: Audit package-manager state
+      ansible.builtin.command: dpkg --audit
+      register: dpkg_audit
+      changed_when: false
+
+    - name: Reject incomplete package state
+      ansible.builtin.assert:
+        that:
+          - dpkg_audit.stdout | trim == ''
+
+    - name: Check whether a reboot is required
+      ansible.builtin.stat:
+        path: /var/run/reboot-required
+      register: reboot_required
+
+    - name: Reboot inside the maintenance window
+      ansible.builtin.reboot:
+        reboot_timeout: 900
+        post_reboot_delay: 15
+        test_command: systemctl is-system-running --wait
+      when:
+        - apply_updates
+        - reboot_if_required
+        - reboot_required.stat.exists
+
+    - name: Require the application service to be active
+      ansible.builtin.command:
+        argv: [systemctl, is-active, --quiet, "{{ app_name }}"]
+      changed_when: false
+
+    - name: Require Nginx to be active
+      ansible.builtin.command:
+        argv: [systemctl, is-active, --quiet, nginx]
+      changed_when: false
+
+    - name: Reject failed systemd units
+      ansible.builtin.command: systemctl --failed --no-legend --plain
+      register: failed_units
+      changed_when: false
+      failed_when: failed_units.stdout | trim != ''

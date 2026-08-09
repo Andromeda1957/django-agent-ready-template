@@ -38,9 +38,9 @@ Two gradients keep it coherent:
 ### Prerequisites
 
 - Python 3.12+, Node 22+, and the GitHub CLI (`gh`) authenticated.
-- For deployment: a VPS or public-facing server you can SSH into (the template
-  deploys via SSH from GitHub Actions). You don't need this to start building
-  locally — only to go live.
+- For deployment: a VPS or public-facing server reachable by SSH. GitHub Actions
+  installs pinned Ansible automatically; a local fallback deploy also needs
+  `ansible-core` and `gio` on the machine running `deploy.sh`.
 
 ### Manual local setup (if you're not using `/install`)
 
@@ -68,11 +68,18 @@ python manage.py runserver
 - **Secure-by-default settings**: `DEBUG` off by default; production security
   headers auto-enable; Argon2 password hashing; secrets only from the
   environment.
-- **Agent memory system**: `AGENTS.md` contract, `docs/runbooks/`, topic memory
-  in `docs/memory/`, an active-state handoff, and `tools/check_memory_system.py`
-  to keep it from rotting.
-- **Deploy pipeline**: a manual, confirmation-gated GitHub Actions `Deploy`
-  workflow that runs `deploy.sh` over SSH after CI passes.
+- **Layered agent memory**: compact contract, runbooks, Git-local task state,
+  explicit resume packets, topic ownership, future-only plans, structured
+  history, semantic audits, and deterministic shape checks.
+- **Cross-agent controls**: exact prompt capture, bounded protected-operation
+  manifests, urgent incident mode, rollback evidence, and a syntax-aware wait
+  hook that ignores words such as `while` and `until` inside written content.
+- **Failure-safe deployment**: a confirmation-gated GitHub Actions workflow
+  invokes Ansible over SSH, prepares a versioned release, atomically changes the
+  active symlink, health-checks it, and restores the previous release on failure.
+- **Scheduled maintenance**: safe non-major Dependabot updates drain one green
+  exact-head PR at a time; Ubuntu host patching is opt-in and independently
+  gated.
 - **TypeScript by default** with a tiny `tsc` build, no bundler.
 
 ## Agent tiers
@@ -95,9 +102,11 @@ agent, you can promote it (replace `GEMINI.md` with a mirror of `AGENTS.md`), bu
 treat full install/deploy driven by Gemini as untested; the pre-commit and CI
 gates are your safety net regardless of which agent writes the code.
 
-No agent deploys to production unattended: the `Deploy` workflow is
-manual-dispatch, requires a typed `deploy` confirmation, and only runs after CI
-passes for that commit. The agent prepares the change; you trigger the deploy.
+Routine objective fixes may be shipped by an agent after exact-commit CI. Broad
+subjective/product work still waits for preview review, and destructive work
+still needs exact current confirmation. The `Deploy` workflow remains
+manual-dispatch and environment-gated, so its production permissions stay
+separate from ordinary CI.
 
 Skills live per agent: `/install` ships for both Claude (`.claude/skills/`) and
 Codex (`.agents/skills/`); other skills are intentionally per-agent so you can
@@ -107,11 +116,15 @@ use each agent for its strengths.
 
 1. Provision a server and a deploy SSH key.
 2. Run `/install` (or set them by hand): GitHub Actions **Variables**
-   `APP_NAME`, `REMOTE_HOST`, `REMOTE_USER`, `REMOTE_DIR`, and **Secrets**
+   `APP_NAME`, `REMOTE_HOST`, `REMOTE_USER`, `REMOTE_DIR`, `APP_DOMAIN`, and
+   optional `ENABLE_HOST_MAINTENANCE`; set **Secrets**
    `PROD_SSH_PRIVATE_KEY`, `PROD_SSH_KNOWN_HOSTS`.
-3. Push to the default branch; let CI pass.
-4. Run the **Deploy** workflow (type `deploy` to confirm). It verifies CI passed
-   for the commit, then runs `deploy.sh` over SSH.
+3. Provision `<REMOTE_DIR>-shared/.env` on the server as the runtime user with
+   mode `0600` or `0640`.
+4. Push to the default branch and let exact-commit CI pass.
+5. Run the **Deploy** workflow (type `deploy` to confirm). It installs Ansible on
+   the runner, connects over SSH, activates the versioned release, and verifies
+   it. The server does not run an Ansible daemon.
 
 > The template secures the **code path** (gates, secret scanning, hardened
 > settings, hardened systemd units). Securing the **infrastructure** — your VPS,
@@ -141,7 +154,7 @@ ask your agent to follow the recipe and the `security-implementation` runbook.
 - Argon2 is already the default hasher. Keep the password validators.
 - Add `accounts` to `INSTALLED_APPS`, `SCAN_ROOTS` in
   `tools/check_security_patterns.py`, and the `deploy.sh` allowlist.
-- Add `docs/memory/accounts.md` (topic-memory shape) and ownership/IDOR negative
+- Add `docs/memory/<accounts>.md` (topic-memory shape) and ownership/IDOR negative
   tests next to the owning views.
 - Add a login-endpoint `limit_req_zone` in `webapp_nginx` (the base already
   rate-limits `/admin/login/`; do the same for your own login route).
@@ -171,11 +184,14 @@ config/            Django project (settings, urls, wsgi)
 web/               Example app: model, services, thin views, templates, tests
 static/web/ts/     TypeScript sources -> compiled to static/web/js/
 constraints.txt    Resolved Python dependency constraints
-tools/             Gate scripts + sync_agents.py
+tools/             Gates, task state, memory/history, and agent controls
 docs/runbooks/     Required workflows
 docs/memory/       Durable topic memory
+docs/resume/       Explicit bounded transfer packets only
+docs/repo_history/ Structured completion and archived context
+ops/ansible/       Versioned deploy and host-maintenance playbooks
 .claude/ .agents/  Per-agent skills, hooks, settings
-deploy.sh          Production deploy (run by the Deploy workflow)
+deploy.sh          Ansible release client (run by the Deploy workflow)
 AGENTS.md          Canonical agent contract (mirrored to CLAUDE.md)
 ```
 
