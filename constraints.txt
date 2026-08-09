@@ -177,7 +177,7 @@ pip-requirements-parser==32.0.1
     # via pip-audit
 platformdirs==4.11.1
     # via pip-audit
-protobuf==6.33.6
+protobuf==7.35.1
     # via
     #   googleapis-common-protos
     #   opentelemetry-proto
