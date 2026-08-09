@@ -167,7 +167,7 @@ packaging==26.3
     #   pip-audit
     #   pip-requirements-parser
     #   semgrep
-peewee==3.19.0
+peewee==4.3.0
     # via semgrep
 pip-api==0.0.34
     # via pip-audit
