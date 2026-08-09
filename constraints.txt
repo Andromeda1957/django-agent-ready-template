@@ -115,7 +115,7 @@ markdown-it-py==4.2.0
     # via rich
 markupsafe==3.0.3
     # via jinja2
-mcp==1.23.3
+mcp==2.0.0
     # via semgrep
 mdurl==0.1.2
     # via markdown-it-py
