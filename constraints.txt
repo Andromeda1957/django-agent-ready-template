@@ -22,7 +22,7 @@ attrs==26.1.0
     #   jsonschema
     #   referencing
     #   semgrep
-boltons==21.0.0
+boltons==26.1.0
     # via
     #   face
     #   glom
