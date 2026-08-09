@@ -283,7 +283,7 @@ urllib3==2.7.0
     #   semgrep
 uvicorn==0.52.1
     # via mcp
-wcmatch==8.5.2
+wcmatch==11.0
     # via semgrep
 wrapt==1.17.3
     # via
