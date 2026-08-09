@@ -11,7 +11,8 @@ after successful CI runs until the safe queue is empty. It processes one pull
 request at a time and verifies:
 
 1. The author is the verified Dependabot App and the base is `main`.
-2. The title is a non-major numeric version transition.
+2. The title is a non-major numeric version transition. For pre-1.0 packages,
+   only changes inside the same `0.x` minor line are automatic.
 3. Every changed path is a dependency manifest, lockfile, or Actions workflow.
 4. The branch includes current `main`.
 5. `Quality gates` passed for that exact head commit.

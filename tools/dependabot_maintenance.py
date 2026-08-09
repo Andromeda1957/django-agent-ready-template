@@ -16,8 +16,8 @@ DEPENDABOT_LOGIN = 'app/dependabot'
 QUALITY_GATE = 'Quality gates'
 DEFAULT_BRANCH = os.environ.get('DEPENDENCY_BASE_BRANCH', 'main')
 VERSION_BUMP_RE = re.compile(
-    r'\bfrom\s+v?(?P<old>[0-9]+)(?:\.[^\s]+)?\s+'
-    r'to\s+v?(?P<new>[0-9]+)(?:\.[^\s]+)?\s*$',
+    r'\bfrom\s+v?(?P<old>[0-9]+(?:\.[0-9]+)?)[^\s]*\s+'
+    r'to\s+v?(?P<new>[0-9]+(?:\.[0-9]+)?)[^\s]*\s*$',
     re.IGNORECASE,
 )
 ALLOWED_FILE_PATTERNS = (
@@ -57,7 +57,17 @@ def dependency_files_are_bounded(files: list[dict[str, Any]]) -> bool:
 
 def version_bump_is_non_major(title: str) -> bool:
     match = VERSION_BUMP_RE.search(title)
-    return bool(match and match.group('old') == match.group('new'))
+    if not match:
+        return False
+    old = tuple(int(part) for part in match.group('old').split('.'))
+    new = tuple(int(part) for part in match.group('new').split('.'))
+    if old[0] != new[0]:
+        return False
+    # Before 1.0, a minor version commonly carries breaking changes. Automate
+    # only patch/pre-release movement inside the same 0.x minor line.
+    if old[0] == 0:
+        return len(old) > 1 and len(new) > 1 and old[1] == new[1]
+    return True
 
 
 def automatic_merge_decision(details: dict[str, Any]) -> PullRequestDecision:

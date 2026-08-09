@@ -9,10 +9,10 @@ from tools.dependabot_maintenance import version_bump_is_non_major
 class DependabotMaintenanceTests(TestCase):
     def test_accepts_non_major_pinned_version_bumps(self):
         self.assertTrue(version_bump_is_non_major(
-            'deps: bump ruff from 0.15.21 to 0.16.0',
+            'deps: bump actions/checkout from 7.0.0 to 7.0.1',
         ))
         self.assertTrue(version_bump_is_non_major(
-            'deps: bump actions/checkout from 7.0.0 to 7.0.1',
+            'deps: bump preview from 0.58b0 to 0.58b1',
         ))
 
     def test_rejects_major_or_unrecognized_version_bumps(self):
@@ -21,6 +21,12 @@ class DependabotMaintenanceTests(TestCase):
         ))
         self.assertFalse(version_bump_is_non_major(
             'deps: update an opaque action SHA',
+        ))
+        self.assertFalse(version_bump_is_non_major(
+            'deps: bump preview from 0.58b0 to 0.64b0',
+        ))
+        self.assertFalse(version_bump_is_non_major(
+            'deps: bump ruff from 0.15.21 to 0.16.0',
         ))
 
     def test_dependency_file_allowlist_is_bounded(self):
