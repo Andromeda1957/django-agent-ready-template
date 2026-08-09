@@ -68,7 +68,7 @@ django==6.1
     # via -r requirements.txt
 django-environ==0.14.0
     # via -r requirements.txt
-exceptiongroup==1.2.2
+exceptiongroup==1.3.1
     # via semgrep
 face==26.0.1
     # via glom
@@ -103,7 +103,7 @@ importlib-metadata==8.7.1
     # via opentelemetry-api
 jinja2==3.1.6
     # via ansible-core
-jsonschema==4.25.1
+jsonschema==4.26.0
     # via
     #   mcp
     #   semgrep
@@ -121,7 +121,7 @@ mdurl==0.1.2
     # via markdown-it-py
 msgpack==1.2.1
     # via cachecontrol
-opentelemetry-api==1.37.0
+opentelemetry-api==1.44.0
     # via
     #   opentelemetry-exporter-otlp-proto-http
     #   opentelemetry-instrumentation
@@ -130,32 +130,32 @@ opentelemetry-api==1.37.0
     #   opentelemetry-sdk
     #   opentelemetry-semantic-conventions
     #   semgrep
-opentelemetry-exporter-otlp-proto-common==1.37.0
+opentelemetry-exporter-otlp-proto-common==1.44.0
     # via opentelemetry-exporter-otlp-proto-http
-opentelemetry-exporter-otlp-proto-http==1.37.0
+opentelemetry-exporter-otlp-proto-http==1.44.0
     # via semgrep
-opentelemetry-instrumentation==0.58b0
+opentelemetry-instrumentation==0.65b0
     # via
     #   opentelemetry-instrumentation-requests
     #   opentelemetry-instrumentation-threading
-opentelemetry-instrumentation-requests==0.58b0
+opentelemetry-instrumentation-requests==0.65b0
     # via semgrep
-opentelemetry-instrumentation-threading==0.58b0
+opentelemetry-instrumentation-threading==0.65b0
     # via semgrep
-opentelemetry-proto==1.37.0
+opentelemetry-proto==1.44.0
     # via
     #   opentelemetry-exporter-otlp-proto-common
     #   opentelemetry-exporter-otlp-proto-http
-opentelemetry-sdk==1.37.0
+opentelemetry-sdk==1.44.0
     # via
     #   opentelemetry-exporter-otlp-proto-http
     #   semgrep
-opentelemetry-semantic-conventions==0.58b0
+opentelemetry-semantic-conventions==0.65b0
     # via
     #   opentelemetry-instrumentation
     #   opentelemetry-instrumentation-requests
     #   opentelemetry-sdk
-opentelemetry-util-http==0.58b0
+opentelemetry-util-http==0.65b0
     # via opentelemetry-instrumentation-requests
 packageurl-python==0.17.6
     # via cyclonedx-python-lib
@@ -191,7 +191,7 @@ pydantic==2.13.4
     # via
     #   mcp
     #   pydantic-settings
-pydantic-core==2.46.4
+pydantic-core==2.47.0
     # via pydantic
 pydantic-settings==2.15.0
     # via mcp
